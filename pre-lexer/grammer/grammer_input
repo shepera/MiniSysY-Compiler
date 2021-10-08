@@ -1,3 +1,4 @@
+==	Eq
 =	Assign	
 ;	Semicolon	
 (	LPar	
@@ -9,4 +10,3 @@
 /	Div	
 <	Lt	
 >	Gt	
-==	Eq

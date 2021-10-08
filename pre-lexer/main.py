@@ -2,13 +2,14 @@ import re
 
 grammer = [{"name": "Ident", "re": "[_a-zA-Z][_0-9a-zA-Z]*"}, {"name": "Number", "re": "[0-9]+"}]
 reserve_word = {}
-with open("grammer_input") as file:
+with open("grammer/grammer_input") as file:
     for line in file.readlines():
         x = line.split()
         grammer.append({"name": x[1], "re": re.escape(x[0])})
-with open("reserve_word") as file:
+with open("grammer/reserve_word") as file:
     for line in file:
-        reserve_word[x[1]] = x[0]
+        x = line.split()
+        reserve_word[x[0]] = x[1]
 
 
 with open("program") as file:
@@ -35,8 +36,8 @@ while start_idx < len(program_input):
                         else "",
                         sep="",
                     )
-                    start_idx += len(ans)
-                    break
+                start_idx += len(ans)
+                break
         if match == None:
             print("Err")
             exit(0)
