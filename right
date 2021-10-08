@@ -1,0 +1,15 @@
+Ident(a)
+Assign
+Number(10)
+Semicolon
+Ident(c)
+Assign
+Ident(a)
+Mult
+Number(2)
+Plus
+Number(3)
+Semicolon
+Return
+Ident(c)
+Semicolon
