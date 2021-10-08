@@ -8,7 +8,8 @@ with open("grammer/grammer_input") as file:
         grammer.append({"name": x[1], "re": re.escape(x[0])})
 with open("grammer/reserve_word") as file:
     for line in file:
-        reserve_word[x[1]] = x[0]
+        x = line.split()
+        reserve_word[x[0]] = x[1]
 
 
 with open("program") as file:
@@ -35,8 +36,8 @@ while start_idx < len(program_input):
                         else "",
                         sep="",
                     )
-                    start_idx += len(ans)
-                    break
+                start_idx += len(ans)
+                break
         if match == None:
             print("Err")
             exit(0)
