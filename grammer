@@ -1,0 +1,12 @@
+=	Assign	
+;	Semicolon	
+(	LPar	
+)	RPar	
+{	LBrace	
+}	RBrace	
++	Plus	
+*	Mult	
+/	Div	
+<	Lt	
+>	Gt	
+==	Eq
