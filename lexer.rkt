@@ -3,6 +3,7 @@
 
 (provide lexer)
 (provide token)
+(provide token-type)
 
 (struct token (type value) #:transparent)
 (struct token-reg (type reg) #:transparent)
@@ -21,7 +22,7 @@
               (file->lines "./grammer/lexer")))
   
 
-(define (lexer program)
+(define (lexer [program "./program_input"])
   (call-with-input-file program
     (lambda (in)
       ; get token list in reverse order
@@ -55,7 +56,7 @@
                        (let ([match-string (bytes->string/utf-8 (list-ref match 0))])
                          (loop
                           (cons (cond
-                                  [(equal? token-reg-type 'Ident)
+                                  [(equal? (token-reg-type reg) 'Ident)
                                    (if (set-member? keywords match-string)
                                        (token (string->symbol (string-titlecase match-string)) match-string)
                                        (token 'Ident match-string))]
@@ -71,5 +72,6 @@
                                 tokens)))
                        (reg-loop (cdr reg-list))))))]))
       (reverse (loop '())))))
-           
-(display (lexer "./program_input"))
+
+
+;(writeln (lexer "./program_input"))

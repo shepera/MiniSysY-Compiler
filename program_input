@@ -1,5 +1,3 @@
-int //main {}
-0x100 0X9
-// 10
-031
-//
+int main(){
+	return 123;
+}

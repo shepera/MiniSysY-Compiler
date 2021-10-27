@@ -1,0 +1,12 @@
+#hash(
+	(CompUnit . (SEQ FuncDef))
+	(FuncDef . (SEQ FuncType Ident LPar RPar Block))
+	(FuncType . (SEQ Int))
+	(Block . (SEQ LBrace Stmt RBrace))
+	(Stmt . (SEQ Return Number Semicolon))
+)
+
+; SEQ 
+; OPT : optional 
+; REPEAT : can repeat 0 or more
+; ALT : could be any one in the list
