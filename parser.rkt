@@ -2,10 +2,12 @@
 
 (require "./lexer.rkt")
 
-(define tokens (lexer))
+(provide parser)
 
+(define tokens (lexer))
 (define grammer (call-with-input-file "./grammer/grammer"
                   (lambda (in) (read in))))
+
 
 ; AST ( E . list( sub-AST ))
 ; Example:
@@ -19,14 +21,14 @@
 
 ; pattern should be a symbol / list
 ; return (AST . remaining tokens) / #f
-(define (parser pattern tokens)
+(define (parser-recur [pattern  'CompUnit] [tokens tokens])
   ; try to match pattern like: A -> BC
   (define (seq-match pattern tokens)
     (if (empty? pattern)
         ; get all matched
         (cons '() tokens)
         ; get remaining pattern in the lexer
-        (let ([ret (parser (car pattern) tokens)])
+        (let ([ret (parser-recur (car pattern) tokens)])
           (if ret
               (let ([remaining-ret (seq-match (cdr pattern) (cdr ret))])
                 (if remaining-ret
@@ -39,7 +41,7 @@
   (define (alt-match pattern tokens)
     (if (empty? pattern)
         #f ; couldn't match any one
-        (let ([ret (parser (car pattern) tokens)])
+        (let ([ret (parser-recur (car pattern) tokens)])
           (if ret
               ret
               (alt-match (cdr pattern) tokens)))))
@@ -55,7 +57,7 @@
          (cons (car tokens) (cdr tokens))]
         ; got a non-terminal one
         [(hash-has-key? grammer pattern)
-         (let ([ret (parser (hash-ref grammer pattern) tokens)])
+         (let ([ret (parser-recur (hash-ref grammer pattern) tokens)])
            (if ret
                (cons (cons pattern (car ret))
                      (cdr ret))
@@ -66,7 +68,12 @@
       (cond
         [(empty? pattern) (cons '() tokens)]
         [(equal? 'SEQ (car pattern)) (seq-match (cdr pattern) tokens)]
-        [(equal? 'ALT (car pattern)) (alt-match (cdr pattern) tokens)]
-        )))
+        [(equal? 'ALT (car pattern)) (alt-match (cdr pattern) tokens)])))
+
+(define (parser [pattern  'CompUnit] [tokens tokens])
+  (let ([ast (parser-recur pattern tokens)])
+    (if ast
+        ast
+        (error "parser fail"))))
 
 (writeln (parser 'CompUnit tokens))
