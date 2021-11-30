@@ -2,6 +2,7 @@
 
 (require "./parser.rkt")
 (require "./lexer.rkt")
+(provide ir-list-generator)
 
 ; get namespace for eval
 (define-namespace-anchor a)
@@ -96,4 +97,4 @@
         
 (define (ir-list-generator [ast ast])
   (CompUnit (cdar ast)))
-(display (ir-list-generator))
+;(display (ir-list-generator))
