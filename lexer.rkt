@@ -4,6 +4,7 @@
 (provide lexer)
 (provide token)
 (provide token-type)
+(provide token-value)
 
 (struct token (type value) #:transparent)
 (struct token-reg (type reg) #:transparent)

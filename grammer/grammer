@@ -1,9 +1,10 @@
 #hash(
 	(CompUnit . (SEQ FuncDef))
 	(FuncDef . (SEQ FuncType Ident LPar RPar Block))
-	(FuncType . (SEQ Int))
+	(FuncType . (ALT Int Void) )
 	(Block . (SEQ LBrace Stmt RBrace))
-	(Stmt . (SEQ Return Number Semicolon))
+	(Stmt . (ALT Ret) )
+	(Ret . (SEQ Return Number Semicolon))
 )
 
 ; SEQ 

@@ -76,4 +76,4 @@
         ast
         (error "parser fail"))))
 
-(writeln (parser 'CompUnit tokens))
+;(writeln (parser 'CompUnit tokens))
