@@ -22,5 +22,5 @@ image = { source = "dockerfile", path = ".", tag = "test" }
 #
 # run 中的每一条命令的工作路径都是你在 dockerfile 中最后一次指定的工作路径。
 run = [
-  "cat $input >./program_input && racket ./print-llvm-ir.rkt",
+  "cat $input >./program_input && racket ./print-llvm-ir.rkt > $ir",
 ]
