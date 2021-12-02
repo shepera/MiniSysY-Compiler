@@ -76,6 +76,7 @@
      global-symbols
      func-name
      (symbol func-name (string-append "@" func-name) 'function))
+    ; deal with the function content
     (cons
      (list
       'define
@@ -95,9 +96,11 @@
 
 
 (define (Stmt ast symbols counter)
+  ;Stmt -> Assign | Exp-Stmt | Block | If | While | Break | Continue | Return
   ((elem-eval (car ast)) (cdr ast) symbols counter))
 
 (define (Ret ast symbols counter)
+  ; Return -> 'return' [Exp] ';'
   (define ret-value (get-code-and-num (Exp (cdadr ast) symbols counter)))
   (append (car ret-value)
           (list(list
@@ -107,9 +110,11 @@
 
 
 (define (Exp ast symbols counter)
+  ; Exp -> AddExp
   (AddExp (cdr ast)  symbols counter))
 
 (define (generate-ir-expr op num1 num2 counter)
+  ; to generate ir code for expressions like : 1 + 2
   (define op-ir
     (cond [(equal? op 'Plus) 'add]
           [(equal? op 'Minus) 'sub]
@@ -131,8 +136,11 @@
             (cdr num2-ir))))))
   
 (define (cal-seq-exp ast symbols counter)
+  ;this function is for AddExp and MulExp, for they have identify form
   (let add-loop ([loop-list (cadr ast)]
-                 [add1 ((elem-eval (caar ast)) (cdar ast) symbols counter)] )
+                  ; first operand, must exist
+                 [add1 ((elem-eval (caar ast)) (cdar ast) symbols counter)])
+    ; caculate the remaining part, loop over the remaining part
     (if (empty? loop-list)
         add1
         (let* ([item (car loop-list)]
@@ -142,10 +150,11 @@
           (add-loop remaining (generate-ir-expr op add1 add2 counter))))))
 
 (define (AddExp ast symbols counter)
-  ; and caculate with the remaining part
+  ; AddExp -> MulExp { ('+' | '-') MulExp }
   (cal-seq-exp ast symbols counter))
   
 (define (MulExp ast symbols counter)
+  ; MulExp -> UnaryExp { ('*' | '/' | '%') UnaryExp }
     (cal-seq-exp ast symbols counter))
 
 (define (UnaryExp ast symbols counter)
@@ -161,8 +170,7 @@
        (cond
          [(equal? op 'Plus) exp] 
          [(equal? op 'Minus)
-          (generate-ir-expr op (Number (token 'Number 0)) exp counter)
-          ]))]))
+          (generate-ir-expr op (Number (token 'Number 0)) exp counter)]))]))
     
 
 (define (PrimaryExp ast symbols counter)
