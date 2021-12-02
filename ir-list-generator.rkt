@@ -118,8 +118,6 @@
           [(equal? op 'Mod ) 'srem]))
   (let ([num1-ir (get-code-and-num num1)]
         [num2-ir (get-code-and-num num2)])
-    (writeln num1-ir)
-    (writeln num2-ir)
     (append
      (car num1-ir)
      (car num2-ir)

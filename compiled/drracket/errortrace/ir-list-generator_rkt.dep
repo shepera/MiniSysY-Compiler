@@ -1,0 +1,1 @@
+("8.2" ta6osx ("f7f8822620c28f259a6c78cd75b2ceed8193f2c6" . "04944c7488a42bfa7aa32c488445da95f08938fb") #"/Users/luxia/code/complier/./lexer.rkt" #"/Users/luxia/code/complier/./parser.rkt" (collects #"errortrace" #"errortrace-key.rkt") (collects #"racket" #"main.rkt") (collects #"racket" #"runtime-config.rkt"))
