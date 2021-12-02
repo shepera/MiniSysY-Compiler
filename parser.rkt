@@ -21,7 +21,7 @@
 
 ; pattern should be a symbol / list
 ; return (AST . remaining tokens) / #f
-(define (parser-recur [pattern  'CompUnit] [tokens tokens])
+(define (parser-recur [pattern 'CompUnit] [tokens tokens])
   ; try to match pattern like: A -> BC
   (define (seq-match pattern tokens)
     (if (empty? pattern)
@@ -45,8 +45,35 @@
           (if ret
               ret
               (alt-match (cdr pattern) tokens)))))
-
   
+  ; try to match pattern like: A -> {B}
+  (define (repeat-match pattern tokens)
+    (if (empty? pattern)
+        ; matched this repeat pattern
+        (cons '() tokens)
+        ; try to remaining pattern in the lexer
+        (let ([ret (parser-recur pattern tokens)])
+          (if ret
+              ; if matched, try to match one more
+              (let* ([matched (car ret)]
+                     [tokens (cdr ret)]
+                     [one-more (repeat-match pattern tokens)])
+                (cons
+                 (cons matched (car one-more))
+                 (cdr one-more)))
+              (cons '() tokens)))))
+    
+  ; try to match pattern like: A -> [B]
+  (define (opt-match pattern tokens)
+    (if (empty? pattern)
+        ; matched this option pattern
+        (cons '() tokens)
+        ; try to remaining pattern in the lexer
+        (let ([ret (parser-recur pattern tokens)])
+          (if ret
+              ret
+              (cons '() tokens)))))
+    
   (if (symbol? pattern)
       ; pattern is a single symbol
       (cond
@@ -68,7 +95,9 @@
       (cond
         [(empty? pattern) (cons '() tokens)]
         [(equal? 'SEQ (car pattern)) (seq-match (cdr pattern) tokens)]
-        [(equal? 'ALT (car pattern)) (alt-match (cdr pattern) tokens)])))
+        [(equal? 'ALT (car pattern)) (alt-match (cdr pattern) tokens)]
+        [(equal? 'REPEAT (car pattern)) (repeat-match (cdr pattern) tokens)]
+        [(equal? 'OPT (car pattern)) (opt-match (cdr pattern) tokens)])))
 
 (define (parser [pattern  'CompUnit] [tokens tokens])
   (let ([ast (parser-recur pattern tokens)])

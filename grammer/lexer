@@ -19,7 +19,7 @@ RBracket           \]
 LBrace             \{
 RBrace             \}
 Plus               \+
-Minus              −
+Minus              -
 Mult               \*
 Div                /
 Mod                %

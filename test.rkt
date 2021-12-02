@@ -1,13 +1,32 @@
-((CompUnit 
-	(FuncDef 
-		(FuncType #(struct:token Int "int")) 
-			#(struct:token Ident "main") 
-			#(struct:token LPar "(") 
-			#(struct:token RPar ")") 
-			(Block 
-				#(struct:token LBrace "{") 
-				(Stmt 
-					#(struct:token Return "return") 
-					#(struct:token Number 123) 
-					#(struct:token Semicolon ";")) 
-				#(struct:token RBrace "}")))))
+(Exp 
+	AddExp 
+		(MulExp 
+			(UnaryExp 
+				(UnaryOp . #(struct:token Minus "-"))
+			(UnaryExp 
+				(UnaryOp . #(struct:token Minus "-")) 
+				(UnaryExp (UnaryOp . #(struct:token Minus "-")) 
+				(UnaryExp PrimaryExp #(struct:token LPar "(")
+				(Exp AddExp (MulExp (UnaryExp 
+				(UnaryOp . #(struct:token Minus "-"))
+				(UnaryExp PrimaryExp . #(struct:token Number 1)))) ()) 
+				#(struct:token RPar ")")))))) ())
+
+(Exp 
+	AddExp 
+		(MulExp 
+			(UnaryExp
+				PrimaryExp . 
+					#(struct:token Number 1))) 
+		((#(struct:token Plus "+") (MulExp (UnaryExp PrimaryExp . #(struct:token Number 2))))))
+
+(list 
+	(token 'LPar "(") 
+	(list 'Exp 'AddExp 
+		(list 'MulExp 
+			(list 'UnaryExp 
+				(cons 'UnaryOp 
+					(token 'Minus "-")) 
+				(list* 'UnaryExp 'PrimaryExp (token 'Number 1)))) 
+		'()) 
+	(token 'RPar ")"))

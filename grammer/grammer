@@ -3,8 +3,14 @@
 	(FuncDef . (SEQ FuncType Ident LPar RPar Block))
 	(FuncType . (ALT Int Void) )
 	(Block . (SEQ LBrace Stmt RBrace))
-	(Stmt . (ALT Ret) )
-	(Ret . (SEQ Return Number Semicolon))
+	(Stmt . (ALT Ret))
+	(Ret . (SEQ Return (OPT . Exp) Semicolon))
+	(Exp . AddExp)
+	(AddExp . (SEQ  MulExp (REPEAT . (SEQ (ALT Plus Minus) MulExp))))
+	(MulExp . (SEQ UnaryExp ))
+	(UnaryExp . (ALT PrimaryExp (SEQ UnaryOp UnaryExp)))
+	(PrimaryExp . (ALT (SEQ LPar Exp RPar) Number))
+	(UnaryOp . (ALT Plus Minus Not))
 )
 
 ; SEQ 

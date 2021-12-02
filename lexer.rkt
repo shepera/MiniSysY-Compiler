@@ -21,7 +21,6 @@
                        [reg (regexp (string-append "^" (list-ref line 1)))]) ; try to match the first word from the input
                   (token-reg type reg)))
               (file->lines "./grammer/lexer")))
-  
 
 (define (lexer [program "./program_input"])
   (call-with-input-file program
