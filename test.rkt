@@ -30,3 +30,15 @@
 				(list* 'UnaryExp 'PrimaryExp (token 'Number 1)))) 
 		'()) 
 	(token 'RPar ")"))
+
+(	
+	(MulExp 
+		(UnaryExp 
+			(UnaryOp . #(struct:token Minus "-")) (... ... ...)) ()) 
+	())
+
+(AddExp 
+	(MulExp 
+		(UnaryExp 
+			(UnaryOp . #(struct:token Minus "-")) (... ... ...)) ()) 
+	())

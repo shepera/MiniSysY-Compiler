@@ -99,24 +99,59 @@
 
 (define (Ret ast symbols counter)
   (define ret-value (get-code-and-num (Exp (cdadr ast) symbols counter)))
-  
   (append (car ret-value)
           (list(list
                 'ret
                 'i32 (cdr ret-value)))))
 
+
+
 (define (Exp ast symbols counter)
   (AddExp (cdr ast)  symbols counter))
 
+(define (generate-ir-expr op num1 num2 counter)
+  (define op-ir
+    (cond [(equal? op 'Plus) 'add]
+          [(equal? op 'Minus) 'sub]
+          [(equal? op 'Mult)  'mul]
+          [(equal? op 'Div) 'sdiv]
+          [(equal? op 'Mod ) 'srem]))
+  (let ([num1-ir (get-code-and-num num1)]
+        [num2-ir (get-code-and-num num2)])
+    (writeln num1-ir)
+    (writeln num2-ir)
+    (append
+     (car num1-ir)
+     (car num2-ir)
+     (list (list
+            (string-append
+             "%" (number->string (counter)))
+            "="
+            op-ir 'i32
+            (cdr num1-ir)
+            ","
+            (cdr num2-ir))))))
+  
+(define (cal-seq-exp ast symbols counter)
+  (let add-loop ([loop-list (cadr ast)]
+                 [add1 ((elem-eval (caar ast)) (cdar ast) symbols counter)] )
+    (if (empty? loop-list)
+        add1
+        (let* ([item (car loop-list)]
+               [op (token-type (car item))]
+               [add2  ((elem-eval (caadr item)) (cdadr item) symbols counter)]
+               [remaining (cdr loop-list)])
+          (add-loop remaining (generate-ir-expr op add1 add2 counter))))))
+
 (define (AddExp ast symbols counter)
-  (MulExp (cdar ast) symbols counter)) ;TODO
+  ; and caculate with the remaining part
+  (cal-seq-exp ast symbols counter))
   
 (define (MulExp ast symbols counter)
-  (UnaryExp (cdar ast) symbols counter)) ;TODO
+    (cal-seq-exp ast symbols counter))
 
 (define (UnaryExp ast symbols counter)
-  (cond
-    
+  (cond   
     [(empty? ast) '()]
     ; if is PrimaryExp
     [(equal? 'PrimaryExp (car ast))
@@ -128,14 +163,8 @@
        (cond
          [(equal? op 'Plus) exp] 
          [(equal? op 'Minus)
-          (let ([prev (get-code-and-num exp)])
-            (append
-             (car prev)
-             (list (list
-                    (string-append
-                     "%" (number->string (counter)))
-                    " = sub i32 0, "
-                    (cdr prev)))))]))]))
+          (generate-ir-expr op (Number (token 'Number 0)) exp counter)
+          ]))]))
     
 
 (define (PrimaryExp ast symbols counter)
@@ -143,7 +172,7 @@
     ; if is just a number
     [(struct? ast) (Number ast)]
     ; if is '(' Exp ')'
-    [(equal? (token-type (car ast)) 'LPar) (Exp  (cdadr ast) symbols counter)]
+    [(equal? (token-type (car ast)) 'LPar) (Exp (cdadr ast) symbols counter)]
     [else '()]))
   
 
