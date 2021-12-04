@@ -55,7 +55,6 @@
 
 (define (VarDecl ast symbols counter)
   (define type 'i32)
-  (display 'VarDecl)
   (define vars (cons (cadr ast) (map cadr (caddr ast))))  
   (apply append
          (map (lambda (var) (VarDef (cdr var) symbols counter type))
@@ -81,8 +80,39 @@
 
 (define (InitVal ast symbols counter)
   (Exp (cdr ast) symbols counter))
-  
 
+(define (ConstDecl ast symbols counter)
+  ;(ConstDecl . (SEQ Const BType ConstDef (REPEAT . (SEQ Comma ConstDef )) Semicolon))
+  (define type 'i32)
+  (define symbol-part (cddr ast))
+  (define vars (cons (car symbol-part)  (map cadr (cadr symbol-part))))
+  (apply append
+         (map (lambda (var) (ConstDef (cdr var) symbols counter type))
+              vars)))
+
+(define (ConstDef ast symbols counter type)
+  (define id (string-append "%" (number->string (counter)))) ; create a i32*
+  (define init-val
+    (get-code-and-num (ConstInitVal (cdr (cdaddr ast)) symbols counter)))
+  (define name (token-value (car ast)))
+  ; put the symbol into hash
+  (try-hash-set! (car symbols) name (symbol name id type (num-feat 'const)))
+  ; give it inital value
+  
+  (cons (list id "= alloca i32")
+        (append
+         (car init-val)
+         (list (list "store i32" (cdr init-val) ", i32*" id)))))
+
+(define (ConstInitVal ast symbols counter)
+  
+  (ConstExp (cdr ast) symbols counter))
+
+(define (ConstExp ast symbols counter)
+  ; (write ast)
+  (AddExp ast symbols counter 'const))
+
+  
 (define (FuncDef ast symbols counter)
   (let ([ret-type (token-type (cdr(list-ref ast 0)))]
         [func-name  (token-value (list-ref ast 1))]
@@ -135,16 +165,19 @@
 
 (define (Assign-Stmt ast symbols counter)
   ;(Assign-Stmt . (SEQ LVal Assign Exp Semicolon))
+  (define ori-lval (LVal (cdar ast) symbols counter))
   (define lval (get-code-and-num (LVal (cdar ast) symbols counter)))
-  (define exp (get-code-and-num (Exp (cdr(list-ref ast 2)) symbols counter )))
-  (writeln lval)
-  (writeln exp)
+  (when (equal? 'const (list-ref ori-lval 1))
+    (error "constant is not a legal left value"))
+  (when (equal? 'function (list-ref ori-lval 1))
+    (error "function is not a legal left value"))
+  (define exp (get-code-and-num (Exp (cdr(list-ref ast 2)) symbols counter)))
   (append
    (car lval)
    (car exp)
    (list (list "store i32" (cdr exp) ", i32*" (cdr lval)))))
 
-(define (LVal ast symbols counter)  
+(define (LVal ast symbols counter [mode 'val])  
   (define name (token-value (car ast)))
   (let iter ([symbol-list symbols])
     ; if can't find the symbol
@@ -152,19 +185,21 @@
         (error "symbol not declared")
         (let ([cur-hash (car symbol-list)])
           ; find in current-hash
+
           (if (hash-has-key? cur-hash name)
               (let ([symbol (hash-ref cur-hash name)])
-                (when (equal? 'function (symbol-type symbol))
-                  (error "function is not a legal left value"))
-                (when (equal? 'const (num-feat-const (symbol-feat symbol)))
-                  (error "constants is not a legal left value"))
-                (list 'incomplete 'i32* (symbol-id symbol)))
+                (when (and (equal? mode 'const)
+                           (not (equal? 'const (num-feat-const (symbol-feat symbol)))))
+                      (error "expect a const"))   
+                (list 'incomplete
+                      (if (equal? 'const (num-feat-const (symbol-feat symbol))) 'const 'i32*)
+                      (symbol-id symbol)))
               (iter (cdr symbol-list)))))))
               
 
 (define (Exp ast symbols counter)
   ; Exp -> AddExp
-  (AddExp (cdr ast)  symbols counter))
+  (AddExp (cdr ast) symbols counter))
 
 (define (generate-ir-expr op num1 num2 counter)
   ; to generate ir code for expressions like : 1 + 2
@@ -188,66 +223,66 @@
             ","
             (cdr num2-ir))))))
   
-(define (cal-seq-exp ast symbols counter)
+(define (cal-seq-exp ast symbols counter [mode 'val])
   ;this function is for AddExp and MulExp, for they have identify form
   (let add-loop ([loop-list (cadr ast)]
                  ; first operand, must exist
-                 [add1 ((elem-eval (caar ast)) (cdar ast) symbols counter)])
+                 [add1 ((elem-eval (caar ast)) (cdar ast) symbols counter mode)])
     ; caculate the remaining part, loop over the remaining part
     (if (empty? loop-list)
         add1
         (let* ([item (car loop-list)]
                [op (token-type (car item))]
-               [add2  ((elem-eval (caadr item)) (cdadr item) symbols counter)]
+               [add2  ((elem-eval (caadr item)) (cdadr item) symbols counter mode)]
                [remaining (cdr loop-list)])
           (add-loop remaining (generate-ir-expr op add1 add2 counter))))))
 
-(define (AddExp ast symbols counter)
+(define (AddExp ast symbols counter [mode 'val])
   ; AddExp -> MulExp { ('+' | '-') MulExp }
-  (cal-seq-exp ast symbols counter))
+  (cal-seq-exp ast symbols counter mode))
   
-(define (MulExp ast symbols counter)
+(define (MulExp ast symbols counter [mode 'val])
   ; MulExp -> UnaryExp { ('*' | '/' | '%') UnaryExp }
-  (cal-seq-exp ast symbols counter))
+  (cal-seq-exp ast symbols counter mode))
 
-(define (UnaryExp ast symbols counter)
+(define (UnaryExp ast symbols counter [mode 'val])
   (cond   
     [(empty? ast) '()]
     ; if is PrimaryExp
     [(equal? 'PrimaryExp (car ast))
-     (PrimaryExp (cdr ast) symbols counter)]
+     (PrimaryExp (cdr ast) symbols counter mode)]
     ; UnaryOp UnaryExp
     [(equal? 'UnaryOp (caar ast))
      (let ([op (token-type (cdar ast))]
-           [exp (UnaryExp (cdadr ast) symbols counter)]);;;;;
+           [exp (UnaryExp (cdadr ast) symbols counter mode)]);;;;;
        (cond
          [(equal? op 'Plus) exp] 
          [(equal? op 'Minus)
           (generate-ir-expr op (Number (token 'Number 0)) exp counter)]))]))
     
 
-(define (PrimaryExp ast symbols counter)
+(define (PrimaryExp ast symbols counter [mode 'val])
   (cond
     ; if is just a number
     [(struct? ast) (Number ast)]
+    ; if is a lVal
     [(equal? (car ast) 'LVal)
-     (let* ([value-ptr (get-code-and-num (LVal (cdr ast) symbols counter))]
+     (let* ([value (LVal (cdr ast) symbols counter mode)]
+            [value-ptr (get-code-and-num value)]
             [prev-code (car value-ptr)]
             [id (cdr value-ptr)])
        (append
         prev-code
         (list (list
                (string-append "%" (number->string (counter)))
-               "= load i32, i32*"
-               id))))]
+               "=" "load" "i32, i32*"
+               id)) ))]
     ; if is '(' Exp ')'
     [(equal? (token-type (car ast)) 'LPar)
      (Exp (cdadr ast) symbols counter)]
     [else '()]))
-  
 
 
-  
 (define (Number token)
   (list 'incomplete 'i32 (token-value token)))
         
