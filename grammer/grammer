@@ -1,19 +1,38 @@
 #hash(
 	(CompUnit . (SEQ FuncDef))
+	; Define
+	(Decl . (ALT ConstDecl VarDecl))
+	(ConstDecl . (SEQ Const BType ConstDef (REPEAT . (SEQ Comma ConstDef )) Semicolon))
+	(BType . Int)
+	(ConstDef . (SEQ Ident Assign ConstInitVal))
+	(ConstInitVal . ConstExp)
+	(ConstExp . AddExp)
+	(VarDecl . (SEQ BType VarDef (REPEAT . (SEQ Comma VarDef)) Semicolon))
+	(VarDef . (SEQ Ident (OPT . (SEQ Assign InitVal))))
+	(InitVal . Exp)
+
 	(FuncDef . (SEQ FuncType Ident LPar RPar Block))
-	(FuncType . (ALT Int Void) )
-	(Block . (SEQ LBrace Stmt RBrace))
-	(Stmt . (ALT Ret))
+	(FuncType . (ALT Int Void))
+
+	;Statement
+	(Block . (SEQ LBrace (REPEAT . (ALT Decl Stmt)) RBrace))
+	(Stmt . (ALT Ret Assign-Stmt Expr-Stmt Empty-Stmt))
+	(Assign-Stmt . (SEQ LVal Assign Exp Semicolon))
+	(Expr-Stmt . (SEQ Exp Semicolon))
 	(Ret . (SEQ Return (OPT . Exp) Semicolon))
+	(Empty-Stmt . Semicolon)
+	(LVal . (SEQ Ident))
+	
+	; Expression
 	(Exp . AddExp)
 	(AddExp . (SEQ  MulExp (REPEAT . (SEQ (ALT Plus Minus) MulExp))))
 	(MulExp . (SEQ UnaryExp (REPEAT . (SEQ (ALT Mult Div Mod) UnaryExp))))
 	(UnaryExp . (ALT PrimaryExp (SEQ UnaryOp UnaryExp)))
-	(PrimaryExp . (ALT (SEQ LPar Exp RPar) Number))
+	(PrimaryExp . (ALT (SEQ LPar Exp RPar) Number LVal))
 	(UnaryOp . (ALT Plus Minus Not))
 )
 
 ; SEQ 
-; OPT : optional 
-; REPEAT : can repeat 0 or more
+; OPT : optional  (cons . )
+; REPEAT : can repeat 0 or more ( . )
 ; ALT : could be any one in the list

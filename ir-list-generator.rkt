@@ -2,6 +2,7 @@
 
 (require "./parser.rkt")
 (require "./lexer.rkt")
+(require "./tools.rkt")
 (provide ir-list-generator)
 
 ; get namespace for eval
@@ -11,22 +12,8 @@
 (define (elem-eval elem)
   (eval elem ns))
 
-(struct symbol (name id type)  #:transparent)
-
-; a counter maker, will increase by itself
-(define (make-counter)
-  (define a 0)
-  (lambda () (set! a (+ 1 a)) a))
-
-; try to add a key-value pair in hash,
-; error when failed
-(define (try-hash-set! hash key value)
-  (if (hash-has-key? hash key)
-      (error "duplicate key")
-      (hash-set!
-       hash
-       key
-       value)))
+(struct symbol (name id type feat)  #:transparent)
+(struct num-feat (const))
 
 ; return (prev-code . value))
 (define (get-code-and-num exp)
@@ -36,24 +23,21 @@
        exp
        (car (list-ref exp (- (length exp) 1))))))
   
-
 ; loop over elem and use eval to deal 
 (define (loop-elem elem-list hash counter)
   (reverse (foldl
-            (lambda ( elem res)
-              (let ([elem (car elem-list)])
-                (let ([type (car elem)]
-                      [content (cdr elem)])
-                  (cons 
-                   ((elem-eval type) content hash counter)
-                   res))))
+            (lambda (elem res)
+              (let ([type (car elem)]
+                    [content (cdr elem)])
+                (cons 
+                 ((elem-eval type) content hash counter)
+                 res) ))
             '()
             elem-list)))
 
 (define (get-llvm-type type)
   (cond [(equal? 'Int type) 'i32]))
   
-
 (define ast (parser))
 
 
@@ -63,6 +47,41 @@
         [counter (make-counter)])
     (loop-elem ast (list global-hash) counter)))
 
+(define (BType ast symbols counter)
+  'i32)
+
+(define (Decl ast symbols counter)
+  ((elem-eval (car ast)) (cdr ast) symbols counter))
+
+(define (VarDecl ast symbols counter)
+  (define type 'i32)
+  (display 'VarDecl)
+  (define vars (cons (cadr ast) (map cadr (caddr ast))))  
+  (apply append
+         (map (lambda (var) (VarDef (cdr var) symbols counter type))
+              vars)))
+
+(define (VarDef ast symbols counter type)
+  (define id (string-append "%" (number->string (counter)))) ; create a i32*
+  (define init-val
+    (if (empty? (cadr ast))
+        '()
+        (get-code-and-num (InitVal (cdr (cadadr ast)) symbols counter))))
+  (define name (token-value (car ast)))
+  ; put the symbol into hash
+  (try-hash-set! (car symbols) name (symbol name id type (num-feat 'var)))
+  ; give it inital value
+  (cons (list id "= alloca i32")
+        (if (empty? init-val)
+            '()
+            (append
+             (car init-val)
+             (list (list "store i32" (cdr init-val) ", i32*" id))))))
+  
+
+(define (InitVal ast symbols counter)
+  (Exp (cdr ast) symbols counter))
+  
 
 (define (FuncDef ast symbols counter)
   (let ([ret-type (token-type (cdr(list-ref ast 0)))]
@@ -75,22 +94,22 @@
     (try-hash-set!
      global-symbols
      func-name
-     (symbol func-name (string-append "@" func-name) 'function))
+     (symbol func-name (string-append "@" func-name) 'function '()))
     ; deal with the function content
-    (cons
-     (list
-      'define
-      'dso_local
-      (get-llvm-type ret-type)
-      (string-append "@" func-name)
-      "()")
-     (car (Block (cdr content) symbols counter)))))
+    (append*
+     (list(list
+           'define
+           'dso_local
+           (get-llvm-type ret-type)
+           (string-append "@" func-name)
+           "()"))
+     (Block (cdr content) symbols counter))))
   
 (define (Block ast symbols counter [args '()])
   ;TODO: need to add args to block-hash
-  (let ([block-hash (make-hash)]) 
+  (let ([block-hash (make-hash)])
     (loop-elem
-     (filter list? ast)
+     (car (filter list? ast))
      (cons block-hash symbols)
      counter)))
 
@@ -108,6 +127,40 @@
                 'i32 (cdr ret-value)))))
 
 
+(define (Empty-Stmt ast symbols counter)
+  '())
+
+(define (Expr-Stmt ast symbols counter)
+  '())
+
+(define (Assign-Stmt ast symbols counter)
+  ;(Assign-Stmt . (SEQ LVal Assign Exp Semicolon))
+  (define lval (get-code-and-num (LVal (cdar ast) symbols counter)))
+  (define exp (get-code-and-num (Exp (cdr(list-ref ast 2)) symbols counter )))
+  (writeln lval)
+  (writeln exp)
+  (append
+   (car lval)
+   (car exp)
+   (list (list "store i32" (cdr exp) ", i32*" (cdr lval)))))
+
+(define (LVal ast symbols counter)  
+  (define name (token-value (car ast)))
+  (let iter ([symbol-list symbols])
+    ; if can't find the symbol
+    (if (empty? symbol-list)
+        (error "symbol not declared")
+        (let ([cur-hash (car symbol-list)])
+          ; find in current-hash
+          (if (hash-has-key? cur-hash name)
+              (let ([symbol (hash-ref cur-hash name)])
+                (when (equal? 'function (symbol-type symbol))
+                  (error "function is not a legal left value"))
+                (when (equal? 'const (num-feat-const (symbol-feat symbol)))
+                  (error "constants is not a legal left value"))
+                (list 'incomplete 'i32* (symbol-id symbol)))
+              (iter (cdr symbol-list)))))))
+              
 
 (define (Exp ast symbols counter)
   ; Exp -> AddExp
@@ -138,7 +191,7 @@
 (define (cal-seq-exp ast symbols counter)
   ;this function is for AddExp and MulExp, for they have identify form
   (let add-loop ([loop-list (cadr ast)]
-                  ; first operand, must exist
+                 ; first operand, must exist
                  [add1 ((elem-eval (caar ast)) (cdar ast) symbols counter)])
     ; caculate the remaining part, loop over the remaining part
     (if (empty? loop-list)
@@ -155,7 +208,7 @@
   
 (define (MulExp ast symbols counter)
   ; MulExp -> UnaryExp { ('*' | '/' | '%') UnaryExp }
-    (cal-seq-exp ast symbols counter))
+  (cal-seq-exp ast symbols counter))
 
 (define (UnaryExp ast symbols counter)
   (cond   
@@ -177,8 +230,19 @@
   (cond
     ; if is just a number
     [(struct? ast) (Number ast)]
+    [(equal? (car ast) 'LVal)
+     (let* ([value-ptr (get-code-and-num (LVal (cdr ast) symbols counter))]
+            [prev-code (car value-ptr)]
+            [id (cdr value-ptr)])
+       (append
+        prev-code
+        (list (list
+               (string-append "%" (number->string (counter)))
+               "= load i32, i32*"
+               id))))]
     ; if is '(' Exp ')'
-    [(equal? (token-type (car ast)) 'LPar) (Exp (cdadr ast) symbols counter)]
+    [(equal? (token-type (car ast)) 'LPar)
+     (Exp (cdadr ast) symbols counter)]
     [else '()]))
   
 
@@ -191,4 +255,4 @@
   (CompUnit (cdar ast)))
 
 
-;(ir-list-generator)
+(ir-list-generator)

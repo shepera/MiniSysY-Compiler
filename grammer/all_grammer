@@ -26,13 +26,14 @@ Stmt         -> Assign
                 | Continue
                 | Return
 
-Assign       -> LVal '=' Exp ';' 
-Exp-Stmt     -> [Exp] ';' 
-If           -> 'if' '(' Cond ')' Stmt [ 'else' Stmt ]
-While        -> 'while' '(' Cond ')' Stmt
-Break        -> 'break' ';' 
-Continue     -> 'continue' ';'
-Return       -> 'return' [Exp] ';'
+Assign-Stmt  -> LVal '=' Exp ';' 
+Expr-Stmt    -> Exp ';' 
+If-Stmt      -> 'if' '(' Cond ')' Stmt [ 'else' Stmt ]
+While-Stmt   -> 'while' '(' Cond ')' Stmt
+Break-Stmt   -> 'break' ';' 
+Cont-Stmt -> 'continue' ';'
+Ret          -> 'return' [Exp] ';'
+Empty-Stmt   -> ';'
 
 Exp          -> AddExp
 Cond         -> LOrExp
