@@ -116,7 +116,7 @@
 (define (ConstDef ast symbols counter type)
   (define id (get-llvm-var counter)) ; create a i32*
   (define init-val
-    (get-code-and-num (ConstInitVal (cdr (cdaddr ast)) symbols counter) counter))
+    (get-code-and-num (ConstInitVal (cdr (cdaddr ast)) symbols counter)))
   (define name (token-value (car ast)))
   ; put the symbol into hash
   (try-hash-set! (car symbols) name (sym name id type (num-feat 'const)))
@@ -233,8 +233,8 @@
           [(equal? op 'Mult)  'mul]
           [(equal? op 'Div) 'sdiv]
           [(equal? op 'Mod ) 'srem]))
-  (let ([num1-ir (get-code-and-num num1 )]
-        [num2-ir (get-code-and-num num2 )])
+  (let ([num1-ir (get-code-and-num num1)]
+        [num2-ir (get-code-and-num num2)])
     (append
      (car num1-ir)
      (car num2-ir)
@@ -293,7 +293,7 @@
     ; if is a lVal
     [(equal? (car ast) 'LVal)
      (let* ([value (LVal (cdr ast) symbols counter mode)]
-            [value-ptr (get-code-and-num value )]
+            [value-ptr (get-code-and-num value)]
             [prev-code (car value-ptr)]
             [id (cdr value-ptr)])
        (append
