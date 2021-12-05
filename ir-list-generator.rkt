@@ -163,8 +163,7 @@
     (loop-elem
      (car (filter list? ast))
      (cons block-hash symbols)
-     counter))
-  )
+     counter)))
 
 
 (define (Stmt ast symbols counter)
@@ -214,7 +213,7 @@
                 (when (and (equal? mode 'const)
                            (not (equal? 'const (num-feat-const (sym-feat symbol)))))
                   (error "expect a const"))   
-               
+
                 (list 'incomplete
                       (if (equal? 'const (num-feat-const (sym-feat symbol))) 'const 'i32*)
                       (sym-id symbol)))
@@ -342,9 +341,13 @@
            'call
            (func-feat-ret (sym-feat func-def))
            (sym-id func-def)
-           (flatten (add-between (map cons (func-feat-para (sym-feat func-def)) (map cdr paras)) ","))))))
-  
-  )
+           (flatten
+            (add-between
+             (map
+              cons
+              (func-feat-para
+               (sym-feat func-def))
+              (map cdr paras)) ",")))))))
 
 (define (Number token)
   (list 'incomplete 'i32 (token-value token)))
