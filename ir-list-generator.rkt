@@ -58,7 +58,6 @@
   (let* ([global-hash (make-hash)]
          [counter (make-counter)]
          [content (loop-elem ast (list global-hash) counter)])
-    (writeln (set->list func-include))
     (append
      (list
       (map
