@@ -22,14 +22,17 @@
 	(Ret . (SEQ Return (OPT . Exp) Semicolon))
 	(Empty-Stmt . Semicolon)
 	(LVal . (SEQ Ident))
-	
+
 	; Expression
 	(Exp . AddExp)
 	(AddExp . (SEQ  MulExp (REPEAT . (SEQ (ALT Plus Minus) MulExp))))
 	(MulExp . (SEQ UnaryExp (REPEAT . (SEQ (ALT Mult Div Mod) UnaryExp))))
-	(UnaryExp . (ALT PrimaryExp (SEQ UnaryOp UnaryExp)))
+	(UnaryExp . (ALT FuncCall PrimaryExp (SEQ UnaryOp UnaryExp)))
 	(PrimaryExp . (ALT (SEQ LPar Exp RPar) Number LVal))
-	(UnaryOp . (ALT Plus Minus Not))
+	(UnaryOp . (ALT Plus Minus Not)) 
+
+	(FuncCall . (SEQ Ident LPar (OPT . FuncRParams) RPar)) ;;; parameter
+	(FuncRParams . (SEQ Exp (REPEAT . (SEQ Comma Exp))))
 )
 
 ; SEQ 

@@ -27,8 +27,15 @@
                 
 
 (define (print-llvm-ir ir-list)
+  ;print declare
+  (for-each
+   (lambda (x)
+     (map (lambda (x) (display x) (display " ")) x)
+     (display "\n"))
+   (car ir-list))
+  ;print function
   (for-each
    (lambda (x)  (print-function x))
-   ir-list))
+   (cdr ir-list)))
 
 (print-llvm-ir ir-list)

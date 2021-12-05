@@ -3,6 +3,7 @@
 (require "./parser.rkt")
 (require "./lexer.rkt")
 (require "./tools.rkt")
+(require racket/set)
 (provide ir-list-generator)
 
 ; get namespace for eval
@@ -12,8 +13,19 @@
 (define (elem-eval elem)
   (eval elem ns))
 
-(struct symbol (name id type feat)  #:transparent)
-(struct num-feat (const))
+(struct sym (name id type feat)  #:transparent)
+(struct num-feat (const)  #:transparent)
+(struct func-feat (ret para)  #:transparent)
+
+(define lib-func (hash 	"getint" (sym "getint" "@getint" 'function (func-feat 'int '()))
+                        "putint"  (sym "putint" "@putint" 'function (func-feat 'void '(i32)))
+                        "getch"  (sym "getch" "@getch" 'function (func-feat 'int '()))
+                        "putch"  (sym "putch" "@putch" 'function (func-feat 'void '(i32)))))
+
+(define func-include (mutable-set))
+
+(define (get-llvm-var counter)
+  (string-append "%x" (number->string (counter))))
 
 ; return (prev-code . value))
 (define (get-code-and-num exp)
@@ -31,7 +43,7 @@
                     [content (cdr elem)])
                 (cons 
                  ((elem-eval type) content hash counter)
-                 res) ))
+                 res)))
             '()
             elem-list)))
 
@@ -43,9 +55,21 @@
 
 ; return block of codes
 (define (CompUnit ast)
-  (let ([global-hash (make-hash)]
-        [counter (make-counter)])
-    (loop-elem ast (list global-hash) counter)))
+  (let* ([global-hash (make-hash)]
+         [counter (make-counter)]
+         [content (loop-elem ast (list global-hash) counter)])
+    (writeln (set->list func-include))
+    (append
+     (list
+      (map
+       (lambda (x)
+         (list
+          'declare
+          (func-feat-ret (sym-feat x))
+          (sym-id x)
+          (func-feat-para (sym-feat x))))
+       (set->list func-include)))
+     content)))
 
 (define (BType ast symbols counter)
   'i32)
@@ -61,14 +85,14 @@
               vars)))
 
 (define (VarDef ast symbols counter type)
-  (define id (string-append "%" (number->string (counter)))) ; create a i32*
+  (define id (get-llvm-var counter)) ; create a i32*
   (define init-val
     (if (empty? (cadr ast))
         '()
         (get-code-and-num (InitVal (cdr (cadadr ast)) symbols counter))))
   (define name (token-value (car ast)))
   ; put the symbol into hash
-  (try-hash-set! (car symbols) name (symbol name id type (num-feat 'var)))
+  (try-hash-set! (car symbols) name (sym name id type (num-feat 'var)))
   ; give it inital value
   (cons (list id "= alloca i32")
         (if (empty? init-val)
@@ -91,12 +115,12 @@
               vars)))
 
 (define (ConstDef ast symbols counter type)
-  (define id (string-append "%" (number->string (counter)))) ; create a i32*
+  (define id (get-llvm-var counter)) ; create a i32*
   (define init-val
-    (get-code-and-num (ConstInitVal (cdr (cdaddr ast)) symbols counter)))
+    (get-code-and-num (ConstInitVal (cdr (cdaddr ast)) symbols counter) counter))
   (define name (token-value (car ast)))
   ; put the symbol into hash
-  (try-hash-set! (car symbols) name (symbol name id type (num-feat 'const)))
+  (try-hash-set! (car symbols) name (sym name id type (num-feat 'const)))
   ; give it inital value
   
   (cons (list id "= alloca i32")
@@ -109,7 +133,6 @@
   (ConstExp (cdr ast) symbols counter))
 
 (define (ConstExp ast symbols counter)
-  ; (write ast)
   (AddExp ast symbols counter 'const))
 
   
@@ -124,7 +147,7 @@
     (try-hash-set!
      global-symbols
      func-name
-     (symbol func-name (string-append "@" func-name) 'function '()))
+     (sym func-name (string-append "@" func-name) 'function '()))
     ; deal with the function content
     (append*
      (list(list
@@ -141,7 +164,8 @@
     (loop-elem
      (car (filter list? ast))
      (cons block-hash symbols)
-     counter)))
+     counter))
+  )
 
 
 (define (Stmt ast symbols counter)
@@ -161,7 +185,7 @@
   '())
 
 (define (Expr-Stmt ast symbols counter)
-  '())
+  (Exp (cdar ast)  symbols counter))
 
 (define (Assign-Stmt ast symbols counter)
   ;(Assign-Stmt . (SEQ LVal Assign Exp Semicolon))
@@ -189,11 +213,12 @@
           (if (hash-has-key? cur-hash name)
               (let ([symbol (hash-ref cur-hash name)])
                 (when (and (equal? mode 'const)
-                           (not (equal? 'const (num-feat-const (symbol-feat symbol)))))
-                      (error "expect a const"))   
+                           (not (equal? 'const (num-feat-const (sym-feat symbol)))))
+                  (error "expect a const"))   
+               
                 (list 'incomplete
-                      (if (equal? 'const (num-feat-const (symbol-feat symbol))) 'const 'i32*)
-                      (symbol-id symbol)))
+                      (if (equal? 'const (num-feat-const (sym-feat symbol))) 'const 'i32*)
+                      (sym-id symbol)))
               (iter (cdr symbol-list)))))))
               
 
@@ -209,14 +234,13 @@
           [(equal? op 'Mult)  'mul]
           [(equal? op 'Div) 'sdiv]
           [(equal? op 'Mod ) 'srem]))
-  (let ([num1-ir (get-code-and-num num1)]
-        [num2-ir (get-code-and-num num2)])
+  (let ([num1-ir (get-code-and-num num1 )]
+        [num2-ir (get-code-and-num num2 )])
     (append
      (car num1-ir)
      (car num2-ir)
      (list (list
-            (string-append
-             "%" (number->string (counter)))
+            (get-llvm-var counter)
             "="
             op-ir 'i32
             (cdr num1-ir)
@@ -249,6 +273,8 @@
   (cond   
     [(empty? ast) '()]
     ; if is PrimaryExp
+    [(equal? 'FuncCall (car ast))
+     (FuncCall (cdr ast) symbols counter)]
     [(equal? 'PrimaryExp (car ast))
      (PrimaryExp (cdr ast) symbols counter mode)]
     ; UnaryOp UnaryExp
@@ -268,13 +294,13 @@
     ; if is a lVal
     [(equal? (car ast) 'LVal)
      (let* ([value (LVal (cdr ast) symbols counter mode)]
-            [value-ptr (get-code-and-num value)]
+            [value-ptr (get-code-and-num value )]
             [prev-code (car value-ptr)]
             [id (cdr value-ptr)])
        (append
         prev-code
         (list (list
-               (string-append "%" (number->string (counter)))
+               (get-llvm-var counter)
                "=" "load" "i32, i32*"
                id)) ))]
     ; if is '(' Exp ')'
@@ -283,6 +309,44 @@
     [else '()]))
 
 
+(define (FuncCall ast symbols counter)
+  (define name (token-value (car ast)))
+  ;define act-para
+  (define paras
+    (if (empty? (third ast))
+        '()
+        (let ([para-list (cdr(third ast))])
+          (map (lambda (x)
+                 (get-code-and-num (Exp (cdr x) symbols counter)))
+               (cons (car para-list)
+                     (map cadr (cadr para-list)))))))
+  ; get func-def
+  (define func-def
+    (cond
+      [(hash-has-key? lib-func name)
+       (set-add! func-include (hash-ref lib-func name))
+       (hash-ref lib-func name)]
+      [else (error "function not declared")]))
+  ;(writeln func-def)
+  ;(writeln (func-feat-para (sym-feat func-def)))
+  
+  (when (not (equal? (length (func-feat-para (sym-feat func-def))) (length  paras)))
+    (error "function call with wrong parameters"))
+  
+  (append
+   (foldl append '() (map car paras))
+   (list (append
+          (if (equal? 'void (func-feat-ret (sym-feat func-def)))
+              '()
+              (list (get-llvm-var counter) "="))
+          (list
+           'call
+           (func-feat-ret (sym-feat func-def))
+           (sym-id func-def)
+           (flatten (add-between (map cons (func-feat-para (sym-feat func-def)) (map cdr paras)) ","))))))
+  
+  )
+
 (define (Number token)
   (list 'incomplete 'i32 (token-value token)))
         
@@ -290,4 +354,4 @@
   (CompUnit (cdar ast)))
 
 
-(ir-list-generator)
+;(ir-list-generator)
