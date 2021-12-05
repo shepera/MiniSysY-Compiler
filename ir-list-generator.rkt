@@ -17,9 +17,9 @@
 (struct num-feat (const)  #:transparent)
 (struct func-feat (ret para)  #:transparent)
 
-(define lib-func (hash 	"getint" (sym "getint" "@getint" 'function (func-feat 'int '()))
+(define lib-func (hash 	"getint" (sym "getint" "@getint" 'function (func-feat 'i32 '()))
                         "putint"  (sym "putint" "@putint" 'function (func-feat 'void '(i32)))
-                        "getch"  (sym "getch" "@getch" 'function (func-feat 'int '()))
+                        "getch"  (sym "getch" "@getch" 'function (func-feat 'i32 '()))
                         "putch"  (sym "putch" "@putch" 'function (func-feat 'void '(i32)))))
 
 (define func-include (mutable-set))
