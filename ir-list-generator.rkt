@@ -327,7 +327,7 @@
                    ret-type
                    (get-llvm-var counter)
                    "="
-                   op-ir 'i32
+                   op-ir type-needed
                    (get-value cast-num1)
                    ","
                    (get-value cast-num2))))))
