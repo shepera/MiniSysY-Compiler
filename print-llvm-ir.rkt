@@ -17,7 +17,7 @@
      (for-each
       (lambda (word)
         (display word) (display " "))
-      x)
+      (cdr x))
      (display "\n"))
    
    (cdr func-list))
