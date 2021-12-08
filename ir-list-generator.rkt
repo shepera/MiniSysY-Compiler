@@ -217,11 +217,11 @@
                 'void
                 'br 'i1
                 (get-value condition) ","
-                "label" (string-append "%" block1) ","
-                "label" (string-append "%" block2)))
+                'label (string-append "%" block1) ","
+                'label (string-append "%" block2)))
          (list (list 'label (string-append block1 ":")))
          (get-code stmt1)
-         (list (list 'void 'br (string-append "%" block2)))
+         (list (list 'void 'br 'label (string-append "%" block2)))
          (list (list 'label (string-append block2 ":")))))
       (let ([block1 (get-llvm-block-id counter)]
             [block2 (get-llvm-block-id counter)]
@@ -236,10 +236,10 @@
                 "label" (string-append "%" block2)))
          (list (list 'label (string-append block1 ":")))
          (get-code stmt1)
-         (list (list 'void 'br (string-append "%" block3))) ; jump to end
+         (list (list 'void 'br 'label (string-append "%" block3))) ; jump to end
          (list (list 'label (string-append block2 ":")))
          (get-code stmt2)
-         (list (list 'void 'br (string-append "%" block3))) ;jump to end
+         (list (list 'void 'br 'label (string-append "%" block3))) ;jump to end
          (list (list 'label (string-append block3 ":")))))))
 
 (define (Expr-Stmt ast symbols counter)
@@ -288,30 +288,27 @@
   (define ori-type (get-type exp))
   (define value (get-value exp))
   (cond [(equal? ori-type type) exp]
-      [(and (equal? ori-type 'i32)
-            (equal? type 'i1))
-       (append
-        (get-code exp)
-        (list (list
-               'i1
-               (get-llvm-var counter)
-               "=" 'icmp 'eq
-               'i32 (get-value exp) ","
-               0)))
-       ]
-      [(and (equal? ori-type 'i1)
-            (equal? type 'i32))
-       (append
-        (get-code exp)
-        (list (list
-               'i32
-               (get-llvm-var counter)
-               "=" 'zext
-               'i1 (get-value exp)
-               'to 'i32)))
-       ]))
-
-
+        [(and (equal? ori-type 'i32)
+              (equal? type 'i1))
+         (append
+          (get-code exp)
+          (list (list
+                 'i1
+                 (get-llvm-var counter)
+                 "=" 'icmp 'ne
+                 'i32 (get-value exp) ","
+                 0)))
+         ]
+        [(and (equal? ori-type 'i1)
+              (equal? type 'i32))
+         (append
+          (get-code exp)
+          (list (list
+                 'i32
+                 (get-llvm-var counter)
+                 "=" 'zext
+                 'i1 (get-value exp)
+                 'to 'i32)))]))
 
 (define (generate-ir-expr op num1 num2 counter)
   ; to generate ir code for expressions like : 1 + 2
@@ -324,16 +321,16 @@
   (define cast-num1 (type-cast num1 type-needed counter))
   (define cast-num2 (type-cast num2 type-needed counter))
   (append
-   (get-code num1)
-   (get-code num2)
+   (get-code cast-num1)
+   (get-code cast-num2)
    (list (flatten (list
                    ret-type
                    (get-llvm-var counter)
                    "="
                    op-ir 'i32
-                   (get-value num1)
+                   (get-value cast-num1)
                    ","
-                   (get-value num2))))))
+                   (get-value cast-num2))))))
   
 (define (cal-seq-exp ast symbols counter [mode 'val])
   ;this function is for AddExp and MulExp, for they have identify form
@@ -399,7 +396,7 @@
          [(equal? op 'Minus)
           (generate-ir-expr op (Number (token 'Number 0)) exp counter)]
          [(equal? op 'Not)
-          (generate-ir-expr 'Ne (list 'incomplete (get-type exp) 0) exp counter)
+          (generate-ir-expr 'Equal (list 'incomplete (get-type exp) 0) exp counter)
           ;(error "'not' unfinish")
           ]))]))
     
