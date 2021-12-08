@@ -1,10 +1,12 @@
 int main() {
-    int a = getch(), b;
-    b = getch();
-    putch(a);
-    putch(b);
-    putch(10);
-    putch(a - 16);
-    putch(b + 6);
+    int a;
+    a = 10;
+    if (+-!!!a) {
+        a = - - -1;
+    }
+    else {
+        a = 0;
+    }
+    putint(a);
     return 0;
 }

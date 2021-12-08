@@ -16,9 +16,10 @@
 
 	;Statement
 	(Block . (SEQ LBrace (REPEAT . (ALT Decl Stmt)) RBrace))
-	(Stmt . (ALT Ret Assign-Stmt Expr-Stmt Empty-Stmt))
+	(Stmt . (ALT Ret Block Assign-Stmt Expr-Stmt If-Stmt Empty-Stmt))
 	(Assign-Stmt . (SEQ LVal Assign Exp Semicolon))
 	(Expr-Stmt . (SEQ Exp Semicolon))
+	(If-Stmt . (SEQ If LPar Cond RPar Stmt (OPT . (SEQ Else Stmt))))
 	(Ret . (SEQ Return (OPT . Exp) Semicolon))
 	(Empty-Stmt . Semicolon)
 	(LVal . (SEQ Ident))
@@ -30,6 +31,13 @@
 	(UnaryExp . (ALT FuncCall PrimaryExp (SEQ UnaryOp UnaryExp)))
 	(PrimaryExp . (ALT (SEQ LPar Exp RPar) Number LVal))
 	(UnaryOp . (ALT Plus Minus Not)) 
+
+	; condition Expression
+	(Cond . LOrExp)
+	(LOrExp . (SEQ LAndExp (REPEAT . (SEQ Or LAndExp))))
+	(LAndExp . (SEQ EqExp (REPEAT . (SEQ And EqExp))))
+	(EqExp . (SEQ RelExp (REPEAT . (SEQ (ALT Equal Ne) RelExp))))
+	(RelExp . (SEQ AddExp (REPEAT . (SEQ (ALT Le Ge Lt Gt) AddExp))))
 
 	(FuncCall . (SEQ Ident LPar (OPT . FuncRParams) RPar)) ;;; parameter
 	(FuncRParams . (SEQ Exp (REPEAT . (SEQ Comma Exp))))
