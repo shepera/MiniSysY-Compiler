@@ -267,7 +267,6 @@
         (error "symbol not declared")
         (let ([cur-hash (car symbol-list)])
           ; find in current-hash
-
           (if (hash-has-key? cur-hash name)
               (let ([symbol (hash-ref cur-hash name)])
                 (when (and (equal? mode 'const)
