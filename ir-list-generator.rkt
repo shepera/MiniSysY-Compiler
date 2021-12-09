@@ -140,7 +140,6 @@
          (list (list 'i32 "store" 'i32 (get-value init-val) ", i32*" id)))))
 
 (define (ConstInitVal ast symbols counter)
-  
   (ConstExp (cdr ast) symbols counter))
 
 (define (ConstExp ast symbols counter)
@@ -177,7 +176,6 @@
      (cons block-hash symbols)
      counter)))
 
-
 (define (Stmt ast symbols counter)
   ;Stmt -> Assign | Exp-Stmt | Block | If | While | Break | Continue | Return
   (let ([res ((elem-eval (car ast)) (cdr ast) symbols counter)])
@@ -194,7 +192,6 @@
                 'ret
                 'i32 (get-value ret-value)))))
 
-
 (define (Empty-Stmt ast symbols counter)
   '())
 
@@ -209,8 +206,7 @@
           (Stmt (second part) symbols counter))))
   (if (empty? stmt2)
       (let ([block1 (get-llvm-block-id counter)]
-            [block2 (get-llvm-block-id counter)])
-        
+            [block2 (get-llvm-block-id counter)])    
         (append
          (get-code condition)
          (list (list
@@ -271,8 +267,7 @@
               (let ([symbol (hash-ref cur-hash name)])
                 (when (and (equal? mode 'const)
                            (not (equal? 'const (num-feat-const (sym-feat symbol)))))
-                  (error "expect a const"))   
-
+                  (error "expect a const"))
                 (list 'incomplete
                       (if (equal? 'const (num-feat-const (sym-feat symbol))) 'const 'i32*)
                       (sym-id symbol)))
@@ -296,8 +291,7 @@
                  (get-llvm-var counter)
                  "=" 'icmp 'ne
                  'i32 (get-value exp) ","
-                 0)))
-         ]
+                 0)))]
         [(and (equal? ori-type 'i1)
               (equal? type 'i32))
          (append
@@ -327,8 +321,7 @@
                    (get-llvm-var counter)
                    "="
                    op-ir type-needed
-                   (get-value cast-num1)
-                   ","
+                   (get-value cast-num1) ","
                    (get-value cast-num2))))))
   
 (define (cal-seq-exp ast symbols counter [mode 'val])
@@ -358,25 +351,17 @@
 
 (define (LOrExp ast symbols counter [mode 'val])
   ; LOrExp -> LAndExp { '||' LAndExp }
-  (cal-seq-exp ast symbols counter mode)
-  ;(error "Or exp not finished")
-  )
+  (cal-seq-exp ast symbols counter mode))
 
 (define (LAndExp ast symbols counter [mode 'val])
   ; LAndExp -> EqExp { '&&' EqExp }
-  (cal-seq-exp ast symbols counter mode)
-  ;(error "And Exp")
-  )
+  (cal-seq-exp ast symbols counter mode))
 
 (define (EqExp ast symbols counter [mode 'val])
-  (cal-seq-exp ast symbols counter mode)
-  ;(error "Eq exp not finish")
-  )
+  (cal-seq-exp ast symbols counter mode))
 
 (define (RelExp ast symbols counter [mode 'val])
-  (cal-seq-exp ast symbols counter mode)
-  ;(error "REL exp not finish")
-  )
+  (cal-seq-exp ast symbols counter mode))
 
 (define (UnaryExp ast symbols counter [mode 'val])
   (cond   
@@ -389,15 +374,14 @@
     ; UnaryOp UnaryExp
     [(equal? 'UnaryOp (caar ast))
      (let ([op (token-type (cdar ast))]
-           [exp (UnaryExp (cdadr ast) symbols counter mode)]);;;;;
+           [exp (UnaryExp (cdadr ast) symbols counter mode)])
        (cond
          [(equal? op 'Plus) exp] 
          [(equal? op 'Minus)
           (generate-ir-expr op (Number (token 'Number 0)) exp counter)]
          [(equal? op 'Not)
-          (generate-ir-expr 'Equal (list 'incomplete (get-type exp) 0) exp counter)
-          ;(error "'not' unfinish")
-          ]))]))
+          (generate-ir-expr 
+          'Equal (list 'incomplete (get-type exp) 0) exp counter)]))]))
     
 
 (define (PrimaryExp ast symbols counter [mode 'val])
