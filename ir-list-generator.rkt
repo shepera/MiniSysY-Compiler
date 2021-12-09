@@ -182,7 +182,7 @@
   ;Stmt -> Assign | Exp-Stmt | Block | If | While | Break | Continue | Return
   (let ([res ((elem-eval (car ast)) (cdr ast) symbols counter)])
     (if (equal? (car ast) 'Block)
-        (car res)
+        (append* '()  res)
         res)))
 
 (define (Ret ast symbols counter)
