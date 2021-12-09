@@ -1,3 +1,4 @@
 *.rkt~
 *.rkt#*#
-./compiled/*
+compiled/
+/grammer/compiled/
