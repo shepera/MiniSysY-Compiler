@@ -32,10 +32,16 @@
    (lambda (x)
      (map (lambda (x) (display x) (display " ")) x)
      (display "\n"))
-   (car ir-list))
+   (first ir-list))
+    ;print declare
+  (for-each
+   (lambda (x)
+     (map (lambda (x) (display x) (display " ")) x)
+     (display "\n"))
+   (second ir-list))
   ;print function
   (for-each
    (lambda (x)  (print-function x))
-   (cdr ir-list)))
+   (cddr ir-list)))
 
 (print-llvm-ir ir-list)

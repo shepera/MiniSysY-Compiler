@@ -1,5 +1,6 @@
 #hash(
-	(CompUnit . (SEQ FuncDef))
+	(CompUnit . (REPEAT . (ALT GlobalDecl FuncDef)))
+	(GlobalDecl . Decl)
 	; Define
 	(Decl . (ALT ConstDecl VarDecl))
 	(ConstDecl . (SEQ Const BType ConstDef (REPEAT . (SEQ Comma ConstDef )) Semicolon))

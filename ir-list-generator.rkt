@@ -4,6 +4,7 @@
 (require "./lexer.rkt")
 (require "./tools.rkt")
 (require "./grammer/op-info.rkt")
+(require "./cal-const.rkt")
 (require racket/set)
 (provide ir-list-generator)
 
@@ -18,12 +19,16 @@
 (struct num-feat (const)  #:transparent)
 (struct func-feat (ret para)  #:transparent)
 
+
 (define lib-func (hash 	"getint" (sym "getint" "@getint" 'function (func-feat 'i32 '()))
                         "putint"  (sym "putint" "@putint" 'function (func-feat 'void '(i32)))
                         "getch"  (sym "getch" "@getch" 'function (func-feat 'i32 '()))
                         "putch"  (sym "putch" "@putch" 'function (func-feat 'void '(i32)))))
                       
 (define func-include (mutable-set))
+
+(define (get-global-var name)
+  (string-append "@" name))
 
 (define (get-llvm-var counter)
   (string-append "%x" (number->string (counter))))
@@ -69,8 +74,19 @@
 (define (CompUnit ast)
   (let* ([global-hash (make-hash)]
          [counter (make-counter)]
-         [content (loop-elem ast (list global-hash) counter)])
+         [var-content
+          (loop-elem
+           (filter
+            (lambda (x) (equal? (car x) 'GlobalDecl)) ast)
+           (list global-hash)
+           counter)]
+         [func-content
+          (loop-elem
+           (filter (lambda (x) (equal? (car x) 'FuncDef)) ast)
+           (list global-hash)
+           counter)])
     (append
+     ; function included
      (list
       (map
        (lambda (x)
@@ -78,9 +94,48 @@
           'declare
           (func-feat-ret (sym-feat x))
           (sym-id x)
-          (func-feat-para (sym-feat x))))
+          (func-feat-para (sym-feat x)))
+         )
        (set->list func-include)))
-     content)))
+     ; global varible declared
+     (list (apply append var-content))
+     ; functions declared
+     func-content)))
+
+
+(define (GlobalDecl ast symbols counter)
+  ; (writeln (cdr ast))
+  ; test if is a const decl
+  (define is-const (equal? (cadr ast) 'ConstDecl))
+  (define type 'i32) ; TODO: should consider array later
+  (define vars
+    (append*
+     (list (if is-const (fifth ast) (fourth ast))) ; first var 
+     (map cdr (if is-const (sixth ast) (fifth ast))))) ;remaining
+
+  (map
+   (lambda (x)
+     ; (writeln x)
+     (let* ([name (token-value (second x))]
+            [value-expr (third x)]
+            [value
+             (if is-const
+                 (cal-const (cdr (fourth x)))
+                 (if (empty? value-expr)
+                     0
+                     (cal-const (cdr (second value-expr)))))])
+       (try-hash-set!
+        (car symbols)
+        name
+        (sym name (get-global-var name) 'i32 (num-feat (if is-const 'const 'var))))
+       (when is-const (registe-var name 'i32 value))
+       (list (get-global-var name) '= 'dso_local 'global 'i32 value)))
+   vars))
+
+
+(define (register-global ast symbols counter)
+  (error "unfiished register global"))
+  
 
 (define (BType ast symbols counter)
   'i32)
@@ -289,7 +344,7 @@
           (list (list
                  'i1
                  (get-llvm-var counter)
-                 "=" 'icmp 'ne
+                 '= 'icmp 'ne
                  'i32 (get-value exp) ","
                  0)))]
         [(and (equal? ori-type 'i1)
@@ -299,7 +354,7 @@
           (list (list
                  'i32
                  (get-llvm-var counter)
-                 "=" 'zext
+                 '= 'zext
                  'i1 (get-value exp)
                  'to 'i32)))]))
 
@@ -319,7 +374,7 @@
    (list (flatten (list
                    ret-type
                    (get-llvm-var counter)
-                   "="
+                   '=
                    op-ir type-needed
                    (get-value cast-num1) ","
                    (get-value cast-num2))))))
@@ -381,7 +436,7 @@
           (generate-ir-expr op (Number (token 'Number 0)) exp counter)]
          [(equal? op 'Not)
           (generate-ir-expr 
-          'Equal (list 'incomplete (get-type exp) 0) exp counter)]))]))
+           'Equal (list 'incomplete (get-type exp) 0) exp counter)]))]))
     
 
 (define (PrimaryExp ast symbols counter [mode 'val])
@@ -399,7 +454,7 @@
         (list (list
                'i32
                (get-llvm-var counter)
-               "=" "load" "i32, i32*"
+               '= "load" "i32, i32*"
                id)) ))]
     ; if is '(' Exp ')'
     [(equal? (token-type (car ast)) 'LPar)
@@ -434,7 +489,7 @@
    (list (cons ret-type (append
                          (if (equal? 'void (func-feat-ret (sym-feat func-def)))
                              '()
-                             (list (get-llvm-var counter) "="))
+                             (list (get-llvm-var counter) '=))
                          (list
                           'call
                           (func-feat-ret (sym-feat func-def))
