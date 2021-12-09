@@ -104,7 +104,6 @@
 
 
 (define (GlobalDecl ast symbols counter)
-  ; (writeln (cdr ast))
   ; test if is a const decl
   (define is-const (equal? (cadr ast) 'ConstDecl))
   (define type 'i32) ; TODO: should consider array later
@@ -115,7 +114,6 @@
 
   (map
    (lambda (x)
-     ; (writeln x)
      (let* ([name (token-value (second x))]
             [value-expr (third x)]
             [value

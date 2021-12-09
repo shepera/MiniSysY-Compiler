@@ -19,21 +19,19 @@
         (display word) (display " "))
       (cdr x))
      (display "\n"))
-   
-   (cdr func-list))
-  
+   (cdr func-list)) 
   (display "}\n")
   )
                 
 
 (define (print-llvm-ir ir-list)
-  ;print declare
+  ;print lib-func declare
   (for-each
    (lambda (x)
      (map (lambda (x) (display x) (display " ")) x)
      (display "\n"))
    (first ir-list))
-    ;print declare
+  ;print viriable declare
   (for-each
    (lambda (x)
      (map (lambda (x) (display x) (display " ")) x)

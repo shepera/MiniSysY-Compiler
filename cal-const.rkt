@@ -10,7 +10,6 @@
   (eval elem ns))
 
 
-
 (struct global-sym (type val) #:transparent)
 (define global-var-hash (make-hash))
 

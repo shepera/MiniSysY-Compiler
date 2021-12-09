@@ -1,1 +1,1 @@
-("8.2" ta6osx ("2abc41e4871f826b0bc5fbb12a9f80ac0e2a2b4f" . "58c912df8a49bba731aba1462870f690dcbd8734") #"/Users/luxia/code/complier/./lexer.rkt" (collects #"errortrace" #"errortrace-key.rkt") (collects #"racket" #"main.rkt") (collects #"racket" #"runtime-config.rkt"))
+("8.2" ta6osx ("cd43c5323f3946dda7d344e202b8c6a7957197c8" . "58c912df8a49bba731aba1462870f690dcbd8734") #"/Users/luxia/code/complier/./lexer.rkt" (collects #"errortrace" #"errortrace-key.rkt") (collects #"racket" #"main.rkt") (collects #"racket" #"runtime-config.rkt"))
