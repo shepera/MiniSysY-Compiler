@@ -538,4 +538,4 @@
 (define (ir-list-generator [ast ast])
   (CompUnit (cdar ast)))
 
-(ir-list-generator (parser))
+; (ir-list-generator (parser))
