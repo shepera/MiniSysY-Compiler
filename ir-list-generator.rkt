@@ -36,7 +36,7 @@
 (define (get-llvm-block-id counter)
   (string-append "x" (number->string (counter))))
 
-; return (prev-code . value))
+
 (define (get-value exp)
   (if (equal? (car exp) 'incomplete)
       (third exp)
@@ -53,22 +53,19 @@
       (first (last exp))))
   
 ; loop over elem and use eval to deal 
-(define (loop-elem elem-list hash counter)
+(define (loop-elem elem-list . rest)
   (reverse (foldl
             (lambda (elem res)
               (let ([type (car elem)]
                     [content (cdr elem)])
                 (cons 
-                 ((elem-eval type) content hash counter)
+                 (apply (elem-eval type) (cons content rest))
                  res)))
             '()
             elem-list)))
 
 (define (get-llvm-type type)
   (cond [(equal? 'Int type) 'i32]))
-  
-(define ast (parser))
-
 
 ; return block of codes
 (define (CompUnit ast)
@@ -129,16 +126,12 @@
        (when is-const (registe-var name 'i32 value))
        (list (get-global-var name) '= 'dso_local 'global 'i32 value)))
    vars))
-
-
-(define (register-global ast symbols counter)
-  (error "unfiished register global"))
   
 
 (define (BType ast symbols counter)
   'i32)
 
-(define (Decl ast symbols counter)
+(define (Decl ast symbols counter [block-start '()] [block-end '()])
   ((elem-eval (car ast)) (cdr ast) symbols counter))
 
 (define (VarDecl ast symbols counter)
@@ -221,22 +214,25 @@
            "()"))
      (Block (cdr content) symbols counter))))
   
-(define (Block ast symbols counter [args '()])
+(define (Block ast symbols counter [block-start '()] [block-end '()] [args '()])
   ;TODO: need to add args to block-hash
   (let ([block-hash (make-hash)])
     (loop-elem
      (car (filter list? ast))
      (cons block-hash symbols)
-     counter)))
+     counter
+     block-start
+     block-end)))
 
-(define (Stmt ast symbols counter)
-  ;Stmt -> Assign | Exp-Stmt | Block | If | While | Break | Continue | Return
-  (let ([res ((elem-eval (car ast)) (cdr ast) symbols counter)])
+(define (Stmt ast symbols counter [block-start '()] [block-end '()])
+  ; Stmt -> Assign | Exp-Stmt | Block | If | While | Break | Continue | Return
+  ; block-start and block-end should only be used by break and continue statmenet
+  (let ([res ((elem-eval (car ast)) (cdr ast) symbols counter block-start block-end)])
     (if (equal? (car ast) 'Block)
         (append* '()  res)
         res)))
 
-(define (Ret ast symbols counter)
+(define (Ret ast symbols counter [block-start '()] [block-end '()])
   ; Return -> 'return' [Exp] ';'
   (define ret-value  (Exp (cdadr ast) symbols counter))
   (append (get-code ret-value)
@@ -245,18 +241,18 @@
                 'ret
                 'i32 (get-value ret-value)))))
 
-(define (Empty-Stmt ast symbols counter)
+(define (Empty-Stmt ast symbols counter [block-start '()] [block-end '()])
   '())
 
-(define (If-Stmt ast symbols counter)
+(define (If-Stmt ast symbols counter [block-start '()] [block-end '()])
   (define condition
     (type-cast (Cond (cdr (third ast)) symbols counter) 'i1 counter))
-  (define stmt1 (Stmt (fifth ast) symbols counter))
+  (define stmt1 (Stmt (fifth ast) symbols counter block-start block-end))
   (define stmt2
     (let ([part (sixth ast)])
       (if (empty? part)
           '()
-          (Stmt (second part) symbols counter))))
+          (Stmt (second part) symbols counter block-start block-end))))
   (if (empty? stmt2)
       (let ([block1 (get-llvm-block-id counter)]
             [block2 (get-llvm-block-id counter)])    
@@ -291,10 +287,10 @@
          (list (list 'void 'br 'label (string-append "%" block3))) ;jump to end
          (list (list 'label (string-append block3 ":")))))))
 
-(define (Expr-Stmt ast symbols counter)
+(define (Expr-Stmt ast symbols counter [block-start '()] [block-end '()])
   (Exp (cdar ast)  symbols counter))
 
-(define (Assign-Stmt ast symbols counter)
+(define (Assign-Stmt ast symbols counter [block-start '()] [block-end '()])
   ;(Assign-Stmt . (SEQ LVal Assign Exp Semicolon))
   (define ori-lval (LVal (cdar ast) symbols counter))
   (define lval  (LVal (cdar ast) symbols counter))
@@ -307,6 +303,41 @@
    (get-code lval)
    (get-code exp)
    (list (list 'i32 "store" 'i32 (get-value exp) ", i32*" (get-value lval)))))
+
+(define (While-Stmt ast symbols counter [block-start '()] [block-end '()])
+  ; actually here is the only source of block-start and block-end
+  (define cond-start (get-llvm-block-id counter))
+  (define content-start (get-llvm-block-id counter))
+  (define end (get-llvm-block-id counter))
+
+  (define condition (Cond (cdr (third ast)) symbols counter))
+  (define content
+    (Stmt (cdr (fifth ast)) symbols counter (string-append "%" cond-start) (string-append "%" end)))
+  (append
+   ; jump to start of while (in case there is a unused block id)
+   (list (list 'void 'br 'label (string-append "%" cond-start)))
+   
+   (list (list 'label (string-append cond-start ":")))
+   (get-code condition)
+   (list (list
+          'void
+          'br 'i1
+          (get-value condition) ","
+          'label (string-append "%" content-start) ","
+          'label (string-append "%" end)))
+
+   (list (list 'label (string-append content-start ":")))
+   (get-code content)
+   (list (list 'void 'br 'label (string-append "%" cond-start))) ;jump to end
+   (list (list 'label (string-append end ":")))))
+
+(define (Break-Stmt ast symbols counter [block-start '()] [block-end '()])
+  (list (list 'void 'br 'label block-end)))
+
+(define (Cont-Stmt ast symbols counter [block-start '()] [block-end '()])
+  (list (list 'void 'br 'label block-start)))
+
+
 
 (define (LVal ast symbols counter [mode 'val])  
   (define name (token-value (car ast)))
@@ -502,9 +533,9 @@
 
 (define (Number token)
   (list 'incomplete 'i32 (token-value token)))
-        
+
+(define ast (parser))
 (define (ir-list-generator [ast ast])
   (CompUnit (cdar ast)))
 
-
-;(ir-list-generator)
+;(ir-list-generator (parser))

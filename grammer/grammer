@@ -17,10 +17,13 @@
 
 	;Statement
 	(Block . (SEQ LBrace (REPEAT . (ALT Decl Stmt)) RBrace))
-	(Stmt . (ALT Ret Block Assign-Stmt Expr-Stmt If-Stmt Empty-Stmt))
+	(Stmt . (ALT Ret Block While-Stmt Break-Stmt Cont-Stmt Assign-Stmt Expr-Stmt If-Stmt Empty-Stmt))
 	(Assign-Stmt . (SEQ LVal Assign Exp Semicolon))
 	(Expr-Stmt . (SEQ Exp Semicolon))
 	(If-Stmt . (SEQ If LPar Cond RPar Stmt (OPT . (SEQ Else Stmt))))
+	(While-Stmt . (SEQ While LPar Cond RPar Stmt))
+	(Break-Stmt . (SEQ Break Semicolon))
+	(Cont-Stmt . (SEQ Continue Semicolon))
 	(Ret . (SEQ Return (OPT . Exp) Semicolon))
 	(Empty-Stmt . Semicolon)
 	(LVal . (SEQ Ident))
