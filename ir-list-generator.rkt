@@ -43,9 +43,9 @@
       (second (last exp))))
 
 (define (get-code exp)
-  (if (equal? (car exp) 'incomplete)
-      '()
-      exp))
+  (cond [(empty? exp) '()]
+        [(equal? (car exp) 'incomplete) '()]
+        [else exp]))
 
 (define (get-type exp)
   (if (equal? (car exp) 'incomplete)
@@ -538,4 +538,4 @@
 (define (ir-list-generator [ast ast])
   (CompUnit (cdar ast)))
 
-;(ir-list-generator (parser))
+(ir-list-generator (parser))
