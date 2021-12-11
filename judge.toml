@@ -1,6 +1,6 @@
 # jobs 是一个哈希表，里面包含你的程序在不同题目环境下会使用的编译和运行策略。
 # jobs.pascal_lex 表示 pascal_lex 这个题目下你的配置
-[jobs.lab8]
+[jobs.mdarray]
 
 # image 规定了镜像如何构建。
 # 我们通常使用 Dockerfile 方法，此时填写 source = "dockerfile"
