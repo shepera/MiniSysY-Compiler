@@ -108,23 +108,25 @@
     (append*
      (list (if is-const (fifth ast) (fourth ast))) ; first var 
      (map cdr (if is-const (sixth ast) (fifth ast))))) ;remaining
-
   (map
    (lambda (x)
      (let* ([name (token-value (second x))]
-            [value-expr (third x)]
+            [array-info (map (lambda (x) (cal-const(second x))) (third x))]
+            [value-expr (fourth x)]
             [value
              (if is-const
-                 (cal-const (cdr (fourth x)))
+                 (implement-const array-info (cal-const (cdr (fifth x)))) 
                  (if (empty? value-expr)
-                     0
-                     (cal-const (cdr (second value-expr)))))])
+                     (if (empty? array-info) 0 'zeroinitializer)
+                     (implement-const
+                      array-info
+                      (cal-const (cdr (second value-expr))))))])
        (try-hash-set!
         (car symbols)
         name
         (sym name (get-global-var name) 'i32 (num-feat (if is-const 'const 'var))))
-       (when is-const (registe-var name 'i32 value))
-       (list (get-global-var name) '= 'dso_local 'global 'i32 value)))
+       (when is-const (registe-var name array-info value))
+       (flatten(list (get-global-var name) '= 'dso_local 'global (get-llvm-init array-info value)))))
    vars))
   
 
@@ -172,9 +174,10 @@
               vars)))
 
 (define (ConstDef ast symbols counter type)
+  ; TODO: changed 
   (define id (get-llvm-var counter)) ; create a i32*
   (define init-val
-    (ConstInitVal (cdr (cdaddr ast)) symbols counter))
+    (ConstInitVal (cdr (cdaddr ast)) symbols counter)) ;probably here
   (define name (token-value (car ast)))
   ; put the symbol into hash
   (try-hash-set! (car symbols) name (sym name id type (num-feat 'const)))
@@ -538,4 +541,4 @@
 (define (ir-list-generator [ast ast])
   (CompUnit (cdar ast)))
 
-; (ir-list-generator (parser))
+(ir-list-generator (parser))

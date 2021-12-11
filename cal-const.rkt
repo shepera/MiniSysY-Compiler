@@ -2,6 +2,9 @@
 (require "./lexer.rkt")
 (provide cal-const)
 (provide registe-var)
+(provide implement-const)
+(provide get-llvm-type)
+(provide get-llvm-init)
 
 (define-namespace-anchor a)
 (define ns (namespace-anchor->namespace a))
@@ -16,11 +19,66 @@
 (define (registe-var name type val)
   (hash-set! global-var-hash name (global-sym type val)))
 
+;(define (format-global-init type arr)
+
 (define (cal-const ast)
-  (Exp (cdr ast)))
+  ;(writeln ((elem-eval (car ast)) (cdr ast)))
+  ((elem-eval (car ast)) (cdr ast)))
+
+(define (implement-const shape value)
+  (define (iter shape value)
+    (if (empty? shape)
+        (if (empty? value) 0 value)
+        (let loop ([len (car shape)]
+                   [child-shape (cdr shape)]
+                   [init value])
+          (if (equal? 0 len)
+              '()
+              (cons (iter child-shape (if (empty? init) '() (car init)))
+                    (loop (- len 1) child-shape (if (empty? init) '() (cdr init))))))))
+  (iter shape value))
+               
+(define (get-llvm-type type)
+  (if (empty? type)
+      'i32
+     (flatten (list "[" (car type) 'x  (get-llvm-type (cdr type)) "]"))))
+
+(define (get-llvm-init shape value)
+  (flatten (list (get-llvm-type shape)
+        (if (or
+             (empty? shape)
+             (not (pair? value)))
+            value
+            (list "[" (add-between (map
+             (lambda (x) (get-llvm-init (cdr shape) x))
+             value) ",") "]")))))
+
+
+
+
+
+(define (cal-array ast)
+  (define array (second ast))
+  (if (empty? array)
+      '()
+      (map (lambda (x) ((elem-eval (cadr x)) (cddr x)))
+           (append* (list (first array)) (map cdr (second array))))))
+
+
+(define (ConstInitArr ast)
+  (cal-array ast))
+
+(define (InitArr ast)
+  (cal-array ast))
+
+(define (ConstExp ast)
+  ((elem-eval (car ast)) (cdr ast)))
+
+(define (ConstInitVal ast)
+  (cal-array ast))
 
 (define (Exp ast)
-  (AddExp (cdr ast)))
+  ((elem-eval (car ast)) (cdr ast)))
 
 (define (cal-seq-exp ast)
   ;this function is for AddExp and MulExp, for they have identify form
@@ -80,6 +138,11 @@
 
 (define (LVal ast)  
   (define name (token-value (car ast)))
+  (define pos (map (lambda (x) (cal-const (second x))) (second ast)))
+  (define (ref pos value)
+    (if (empty? pos)
+        value
+        (ref (cdr pos) (list-ref value (car pos)))))
   (if (hash-has-key? global-var-hash name)
-      (global-sym-val (hash-ref global-var-hash name))
+      (ref pos (global-sym-val (hash-ref global-var-hash name)))
       (error "symbol not defined")))
