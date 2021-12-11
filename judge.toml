@@ -1,6 +1,6 @@
 # jobs 是一个哈希表，里面包含你的程序在不同题目环境下会使用的编译和运行策略。
 # jobs.pascal_lex 表示 pascal_lex 这个题目下你的配置
-[jobs.lab6]
+[jobs.lab7]
 
 # image 规定了镜像如何构建。
 # 我们通常使用 Dockerfile 方法，此时填写 source = "dockerfile"
@@ -22,5 +22,5 @@ image = { source = "dockerfile", path = ".", tag = "test" }
 #
 # run 中的每一条命令的工作路径都是你在 dockerfile 中最后一次指定的工作路径。
 run = [
-  "cat $input >./program_input && racket ./print-llvm-ir.rkt > $ir",
+  "cat $input && cat $input >./program_input && racket ./print-llvm-ir.rkt > $ir",
 ]
