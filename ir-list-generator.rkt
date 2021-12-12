@@ -157,7 +157,7 @@
   (if (empty? array-info)
       ; if it's number
    
-      (let ([ exp (if (empty? (third ast))
+      (let ([exp (if (empty? (third ast))
                       '()
                       (InitVal (cdr (second (third ast))) symbols counter id))])
         (try-hash-set! (car symbols) name (sym name id type (num-feat 'var)))
@@ -166,6 +166,7 @@
               exp))
       ; if it's an array
       (let* ([exp (second ast)])
+        (try-hash-set! (car symbols) name (sym name id array-info (num-feat 'var)))
         (cons (cons array-info (flatten (list id '= 'alloca (get-llvm-type array-info))))
          (InitVal (cdr (second (third ast))) symbols counter id array-info)))))
 
