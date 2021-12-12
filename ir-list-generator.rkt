@@ -171,7 +171,9 @@
         (append* (list (cons array-info (flatten (list id '= 'alloca (get-llvm-type array-info)))))
                  (list (flatten (list 'void head '= 'bitcast (get-llvm-type array-info) '* id 'to 'i32*)))
                  (list (list 'void 'call 'void '@memset "(" 'i32* head "," 'i32 0 "," 'i32 (* 4(apply * array-info)) ")" ))
-                 (list (InitVal (cdr (second (third ast))) symbols counter id array-info))))))
+                 (if (empty? (third ast))
+                     '()
+                     (list (InitVal (cdr (second (third ast))) symbols counter id array-info)))))))
 
 (define (generate-store exp pos)
   (append
@@ -339,9 +341,9 @@
   ;(Assign-Stmt . (SEQ LVal Assign Exp Semicolon))
   (define ori-lval (LVal (cdar ast) symbols counter))
   (define lval  (LVal (cdar ast) symbols counter))
-  (when (equal? 'const (list-ref ori-lval 1))
+  (when (equal? 'const (get-type ori-lval ))
     (error "constant is not a legal left value"))
-  (when (equal? 'function (list-ref ori-lval 1))
+  (when (equal? 'function (get-type ori-lval))
     (error "function is not a legal left value"))
   (define exp (Exp (cdr(list-ref ast 2)) symbols counter))
   (append
@@ -604,4 +606,4 @@
 (define (ir-list-generator [ast ast])
   (CompUnit (cdar ast)))
 
-(ir-list-generator (parser))
+;(ir-list-generator (parser))
