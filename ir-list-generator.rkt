@@ -24,7 +24,6 @@
                         "putint"  (sym "putint" "@putint" 'function (func-feat 'void '(i32)))
                         "getch"  (sym "getch" "@getch" 'function (func-feat 'i32 '()))
                         "putch"  (sym "putch" "@putch" 'function (func-feat 'void '(i32)))
-                        ; TODO: complish
                         "memset" (sym "memset" "@memset" 'function (func-feat 'void '(i32*, i32, i32)))))
                       
 (define func-include (mutable-set))
@@ -119,9 +118,6 @@
             [array-info (map (lambda (x) (cal-const(second x))) (third x))]
             [value-expr (fourth x)]
             [value
-             ;(if is-const
-                ; (begin (writeln x)
-                 ;(implement-const array-info (cal-const (cdr (fifth x))))) 
                  (if (empty? value-expr)
                      (if (empty? array-info) 0 'zeroinitializer)
                      (implement-const
@@ -195,7 +191,8 @@
                   )))))
 
 (define (InitArr ast symbols counter pos [shape '()])
-  (define content (append  (list (car (second ast))) (map second (cadr (second ast)))))
+  (define content
+    (if (empty? (second ast)) '() (append (list (car (second ast))) (map second (cadr (second ast))))))
   (define ptrs (map (lambda (x) (generate-get-ptr shape pos x counter))
                     (range (length content))))
 
