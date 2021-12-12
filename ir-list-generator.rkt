@@ -119,17 +119,20 @@
             [array-info (map (lambda (x) (cal-const(second x))) (third x))]
             [value-expr (fourth x)]
             [value
-             (if is-const
-                 (implement-const array-info (cal-const (cdr (fifth x)))) 
+             ;(if is-const
+                ; (begin (writeln x)
+                 ;(implement-const array-info (cal-const (cdr (fifth x))))) 
                  (if (empty? value-expr)
                      (if (empty? array-info) 0 'zeroinitializer)
                      (implement-const
                       array-info
-                      (cal-const (cdr (second value-expr))))))])
+                      (cal-const (cdr (second value-expr)))))])
        (try-hash-set!
         (car symbols)
         name
-        (sym name (get-global-var name) 'i32 (num-feat (if is-const 'const 'var))))
+        (sym name (get-global-var name)
+             (if(empty? array-info) 'i32 array-info)
+             (num-feat (if is-const 'const 'var))))
        (when is-const (registe-var name array-info value))
        (flatten(list (get-global-var name) '= 'dso_local 'global (get-llvm-init array-info value)))))
    vars))
@@ -158,17 +161,21 @@
       ; if it's number
    
       (let ([exp (if (empty? (third ast))
-                      '()
-                      (InitVal (cdr (second (third ast))) symbols counter id))])
+                     '()
+                     (InitVal (cdr (second (third ast))) symbols counter id))])
         (try-hash-set! (car symbols) name (sym name id type (num-feat 'var)))
         ; give it inital value
         (cons (list 'void id '= 'alloca 'i32)
               exp))
       ; if it's an array
-      (let* ([exp (second ast)])
+      (let* ([exp (second ast)]
+             [head (get-llvm-var counter)])
         (try-hash-set! (car symbols) name (sym name id array-info (num-feat 'var)))
-        (cons (cons array-info (flatten (list id '= 'alloca (get-llvm-type array-info))))
-         (InitVal (cdr (second (third ast))) symbols counter id array-info)))))
+        (set-add! func-include (hash-ref lib-func "memset"))
+        (append* (list (cons array-info (flatten (list id '= 'alloca (get-llvm-type array-info)))))
+                 (list (flatten (list 'void head '= 'bitcast (get-llvm-type array-info) '* id 'to 'i32*)))
+                 (list (list 'void 'call 'void '@memset "(" 'i32* head "," 'i32 0 "," 'i32 (* 4(apply * array-info)) ")" ))
+                 (list (InitVal (cdr (second (third ast))) symbols counter id array-info))))))
 
 (define (generate-store exp pos)
   (append
@@ -187,27 +194,25 @@
                   'i32 0 "," 'i32 pos 
                   )))))
 
-(define (InitArr ast symbols counter pos [shape '()] [prev '()])
-  ;(write ast)
-
+(define (InitArr ast symbols counter pos [shape '()])
   (define content (append  (list (car (second ast))) (map second (cadr (second ast)))))
   (define ptrs (map (lambda (x) (generate-get-ptr shape pos x counter))
                     (range (length content))))
 
-  (define aaa (map
-               (lambda (x p)
-                 ((elem-eval (car x)) (cdr x) symbols counter (get-value p) (cdr shape)))
-               content ptrs))
- ; (writeln aaa)
-   (append* (append* '() ptrs) aaa)
- )
-  
+  (append* (append* '() ptrs)
+           (map
+            (lambda (x p)
+              ((elem-eval (car x)) (cdr x) symbols counter (get-value p) (cdr shape)))
+            content ptrs)))
+ 
 
-(define (InitVal ast symbols counter [pos '()] [shape '()] [prev '()])
-  (define exp (if (equal? (car ast) 'Exp)
-                  (Exp (cdr ast) symbols counter)
+(define (InitVal ast symbols counter [pos '()] [shape '()])
+  (define exp (if (or (equal? (car ast) 'Exp)
+                      (equal? (car ast) 'ConstExp))
+                  ((elem-eval (car ast)) (cdr ast) symbols counter)
                   ((elem-eval (car ast)) (cdr ast) symbols counter pos shape)))
-  (if (equal? (car ast) 'InitArr)
+  (if (or (equal? (car ast) 'InitArr)
+          (equal? (car ast) 'ConstInitArr))
       exp
       (generate-store exp pos)))
 
@@ -217,27 +222,19 @@
   (define type 'i32)
   (define symbol-part (cddr ast))
   (define vars (cons (car symbol-part)  (map cadr (cadr symbol-part))))
+  
   (apply append
          (map (lambda (var) (ConstDef (cdr var) symbols counter type))
               vars)))
 
 (define (ConstDef ast symbols counter type)
-  ; TODO: changed 
-  (define id (get-llvm-var counter)) ; create a i32*
-  (define init-val
-    (ConstInitVal (cdr (cdaddr ast)) symbols counter)) ;probably here
-  (define name (token-value (car ast)))
-  ; put the symbol into hash
-  (try-hash-set! (car symbols) name (sym name id type (num-feat 'const)))
-  ; give it inital value
-  
-  (cons (list 'void id "= alloca i32")
-        (append
-         (get-code init-val)
-         (list (list 'i32 "store" 'i32 (get-value init-val) ", i32*" id)))))
+  (VarDef ast symbols counter type))
 
-(define (ConstInitVal ast symbols counter)
-  (ConstExp (cdr ast) symbols counter))
+(define (ConstInitArr ast symbols counter pos [shape '()])
+  (InitArr ast symbols counter pos shape))
+  
+(define (ConstInitVal ast symbols counter [pos '()] [shape '()])
+  (InitVal (cdr ast) symbols counter pos shape))
 
 (define (ConstExp ast symbols counter)
   (AddExp ast symbols counter 'const))
@@ -393,7 +390,6 @@
 (define (LVal ast symbols counter [mode 'val])  
   (define name (token-value (car ast)))
   (define array-info (map (lambda (x) (cal-const (second x))) (second ast)))
-  ; todo
   (let iter ([symbol-list symbols])
     ; if can't find the symbol
     (if (empty? symbol-list)
@@ -405,10 +401,23 @@
                 (when (and (equal? mode 'const)
                            (not (equal? 'const (num-feat-const (sym-feat symbol)))))
                   (error "expect a const"))
-                (list 'incomplete
-                      (if (equal? 'const (num-feat-const (sym-feat symbol))) 'const 'i32*)
-                      (sym-id symbol)))
-              (iter (cdr symbol-list)))))))
+                (if (pair? (sym-type symbol))
+                    (begin
+                      (when (not (equal? (length array-info) (length (sym-type symbol))))
+                        (error "disagreement in array dimension"))
+                      (let loop ([shape (sym-type symbol)]
+                                 [ref array-info]
+                                 [ptr (sym-id symbol)])
+                        (if (empty? shape)
+                            '()
+                        (let ([prev (generate-get-ptr shape ptr (car ref) counter)])
+                            (append
+                         prev
+                         (loop (cdr shape) (cdr ref) (get-value prev)))))))
+                    (list 'incomplete
+                          (if (equal? 'const (num-feat-const (sym-feat symbol))) 'const 'i32*)
+                          (sym-id symbol))))
+                (iter (cdr symbol-list)))))))
               
 
 (define (Exp ast symbols counter)
@@ -591,4 +600,4 @@
 (define (ir-list-generator [ast ast])
   (CompUnit (cdar ast)))
 
-(ir-list-generator (parser))
+;(ir-list-generator (parser))

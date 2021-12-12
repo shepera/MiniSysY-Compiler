@@ -5,8 +5,8 @@
 	(Decl . (ALT ConstDecl VarDecl))
 	(ConstDecl . (SEQ Const BType ConstDef (REPEAT . (SEQ Comma ConstDef )) Semicolon))
 	(BType . Int)
-	(ConstDef . (SEQ Ident (REPEAT . (SEQ LBracket ConstExp RBracket)) Assign ConstInitVal))
-	(ConstInitVal . (ALT ConstExp ConstInitArr))
+	(ConstDef . (SEQ Ident (REPEAT . (SEQ LBracket ConstExp RBracket)) (SEQ Assign ConstInitVal)))
+	(ConstInitVal . (ALT ConstExp InitArr))
 	(ConstInitArr . (SEQ LBrace (OPT . (SEQ ConstInitVal (REPEAT . (SEQ Comma ConstInitVal)))) RBrace))
 	(ConstExp . AddExp)
 	(VarDecl . (SEQ BType VarDef (REPEAT . (SEQ Comma VarDef)) Semicolon))
@@ -28,7 +28,7 @@
 	(Cont-Stmt . (SEQ Continue Semicolon))
 	(Ret . (SEQ Return (OPT . Exp) Semicolon))
 	(Empty-Stmt . Semicolon)
-	
+
 	(LVal . (SEQ Ident (REPEAT . (SEQ LBracket Exp RBracket))))
 
 	; Expression
