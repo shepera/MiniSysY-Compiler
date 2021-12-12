@@ -118,11 +118,16 @@
             [array-info (map (lambda (x) (cal-const(second x))) (third x))]
             [value-expr (fourth x)]
             [value
-                 (if (empty? value-expr)
-                     (if (empty? array-info) 0 'zeroinitializer)
-                     (implement-const
-                      array-info
-                      (cal-const (cdr (second value-expr)))))])
+             (if (empty? value-expr)
+                 (if (empty? array-info) 0 'zeroinitializer)
+                 (implement-const
+                  array-info
+                  (cal-const (cdr (second value-expr)))))])
+       (when (not (empty? array-info))
+         (when (foldl
+                (lambda (x y) (or x y))
+                #f (map (lambda (x) (<= x 0)) array-info))
+           (error "array size under 0")))
        (try-hash-set!
         (car symbols)
         name
@@ -155,7 +160,6 @@
   ; put the symbol into hash
   (if (empty? array-info)
       ; if it's number
-   
       (let ([exp (if (empty? (third ast))
                      '()
                      (InitVal (cdr (second (third ast))) symbols counter id))])
@@ -166,6 +170,11 @@
       ; if it's an array
       (let* ([exp (second ast)]
              [head (get-llvm-var counter)])
+        (when (foldl
+               (lambda (x y) (or x y))
+               #f
+               (map (lambda (x) (<= x 0)) array-info))
+               (error "array size under 0"))
         (try-hash-set! (car symbols) name (sym name id array-info (num-feat 'var)))
         (set-add! func-include (hash-ref lib-func "memset"))
         (append* (list (cons array-info (flatten (list id '= 'alloca (get-llvm-type array-info)))))
@@ -389,9 +398,9 @@
 (define (LVal ast symbols counter [mode 'val])  
   (define name (token-value (car ast)))
   (define array-par (map
-                      (lambda (x)
-                        ((elem-eval (car (second x))) (cdr (second x)) symbols counter))
-                      (second ast)))
+                     (lambda (x)
+                       ((elem-eval (car (second x))) (cdr (second x)) symbols counter))
+                     (second ast)))
   (define prev-code (map get-code array-par))
   (define array-info (map get-value array-par))
   
@@ -411,19 +420,19 @@
                       (when (not (equal? (length array-info) (length (sym-type symbol))))
                         (error "disagreement in array dimension"))
                       (append (append* '() prev-code)
-                               (let loop ([shape (sym-type symbol)]
-                                 [ref array-info]
-                                 [ptr (sym-id symbol)])
-                        (if (empty? shape)
-                            '()
-                        (let ([prev (generate-get-ptr shape ptr (car ref) counter)])
-                            (append
-                         prev
-                         (loop (cdr shape) (cdr ref) (get-value prev))))))))
+                              (let loop ([shape (sym-type symbol)]
+                                         [ref array-info]
+                                         [ptr (sym-id symbol)])
+                                (if (empty? shape)
+                                    '()
+                                    (let ([prev (generate-get-ptr shape ptr (car ref) counter)])
+                                      (append
+                                       prev
+                                       (loop (cdr shape) (cdr ref) (get-value prev))))))))
                     (list 'incomplete
                           (if (equal? 'const (num-feat-const (sym-feat symbol))) 'const 'i32*)
                           (sym-id symbol))))
-                (iter (cdr symbol-list)))))))
+              (iter (cdr symbol-list)))))))
               
 
 (define (Exp ast symbols counter)

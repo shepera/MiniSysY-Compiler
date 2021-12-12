@@ -54,9 +54,6 @@
                                              value) ",") "]")))))
 
 
-
-
-
 (define (cal-array ast)
   (define array (second ast))
   (if (empty? array)
