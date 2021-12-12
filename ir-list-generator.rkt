@@ -386,7 +386,13 @@
 
 (define (LVal ast symbols counter [mode 'val])  
   (define name (token-value (car ast)))
-  (define array-info (map (lambda (x) (cal-const (second x))) (second ast)))
+  (define array-par (map
+                      (lambda (x)
+                        ((elem-eval (car (second x))) (cdr (second x)) symbols counter))
+                      (second ast)))
+  (define prev-code (map get-code array-par))
+  (define array-info (map get-value array-par))
+  
   (let iter ([symbol-list symbols])
     ; if can't find the symbol
     (if (empty? symbol-list)
@@ -402,7 +408,8 @@
                     (begin
                       (when (not (equal? (length array-info) (length (sym-type symbol))))
                         (error "disagreement in array dimension"))
-                      (let loop ([shape (sym-type symbol)]
+                      (append (append* '() prev-code)
+                               (let loop ([shape (sym-type symbol)]
                                  [ref array-info]
                                  [ptr (sym-id symbol)])
                         (if (empty? shape)
@@ -410,7 +417,7 @@
                         (let ([prev (generate-get-ptr shape ptr (car ref) counter)])
                             (append
                          prev
-                         (loop (cdr shape) (cdr ref) (get-value prev)))))))
+                         (loop (cdr shape) (cdr ref) (get-value prev))))))))
                     (list 'incomplete
                           (if (equal? 'const (num-feat-const (sym-feat symbol))) 'const 'i32*)
                           (sym-id symbol))))
@@ -597,4 +604,4 @@
 (define (ir-list-generator [ast ast])
   (CompUnit (cdar ast)))
 
-;(ir-list-generator (parser))
+(ir-list-generator (parser))
