@@ -499,7 +499,7 @@
   (cal-seq-exp ast symbols counter mode))
 
 (define (Cond ast symbols counter)
-  (LOrExp (cdr ast) symbols counter))
+  (type-cast (LOrExp (cdr ast) symbols counter) 'i1 counter))
 
 (define (LOrExp ast symbols counter [mode 'val])
   ; LOrExp -> LAndExp { '||' LAndExp }
