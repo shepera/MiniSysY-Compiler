@@ -20,8 +20,7 @@
       (cdr x))
      (display "\n"))
    (cdr func-list)) 
-  (display "}\n")
-  )
+  (display "}\n"))
                 
 
 (define (print-llvm-ir ir-list)

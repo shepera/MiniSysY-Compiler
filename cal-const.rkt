@@ -41,17 +41,17 @@
 (define (get-llvm-type type)
   (if (empty? type)
       'i32
-     (flatten (list "[" (car type) 'x  (get-llvm-type (cdr type)) "]"))))
+      (flatten (list "[" (car type) 'x  (get-llvm-type (cdr type)) "]"))))
 
 (define (get-llvm-init shape value)
   (flatten (list (get-llvm-type shape)
-        (if (or
-             (empty? shape)
-             (not (pair? value)))
-            value
-            (list "[" (add-between (map
-             (lambda (x) (get-llvm-init (cdr shape) x))
-             value) ",") "]")))))
+                 (if (or
+                      (empty? shape)
+                      (not (pair? value)))
+                     value
+                     (list "[" (add-between (map
+                                             (lambda (x) (get-llvm-init (cdr shape) x))
+                                             value) ",") "]")))))
 
 
 
