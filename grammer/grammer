@@ -14,8 +14,10 @@
 	(InitVal . (ALT Exp InitArr))
 	(InitArr . (SEQ LBrace (OPT . (SEQ InitVal (REPEAT . (SEQ Comma InitVal)))) RBrace))
 
-	(FuncDef . (SEQ FuncType Ident LPar RPar Block))
+	(FuncDef . (SEQ FuncType Ident LPar (OPT . FuncFParams) RPar Block))
 	(FuncType . (ALT Int Void))
+	(FuncFParams . (SEQ FuncFParam (REPEAT . (SEQ Comma FuncFParam))))
+	(FuncFParam . (SEQ BType Ident (OPT . (SEQ LBracket RBracket (REPEAT . (SEQ LBracket Exp RBracket))))))
 
 	;Statement
 	(Block . (SEQ LBrace (REPEAT . (ALT Decl Stmt)) RBrace))

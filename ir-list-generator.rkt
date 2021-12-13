@@ -24,6 +24,8 @@
                         "putint"  (sym "putint" "@putint" 'function (func-feat 'void '(i32)))
                         "getch"  (sym "getch" "@getch" 'function (func-feat 'i32 '()))
                         "putch"  (sym "putch" "@putch" 'function (func-feat 'void '(i32)))
+                        "getarray" (sym "getarray" "@getarray" 'function (func-feat 'i32 '((ptr))))
+                        "putarray" (sym "putarray" "@putarray" 'function (func-feat 'void '(i32 (ptr))))
                         "memset" (sym "memset" "@memset" 'function (func-feat 'void '(i32* i32 i32)))))
                       
 (define func-include (mutable-set))
@@ -66,10 +68,15 @@
             elem-list)))
 
 (define (get-llvm-type type)
-  (cond [(equal? 'Int type) 'i32]
-        [(equal? '() type) 'i32]
+  (cond [(equal? 'Int type) "i32"]
+        [(equal? '() type) "i32"]
+        [(equal? 'i32 type) "i32"]
+        [(and (list? type)
+              (equal? (car type) 'ptr))
+         (string-append (get-llvm-type (cdr type)) "*")]
         [(list? type)
-         (flatten (list "[" (car type) 'x  (get-llvm-type (cdr type)) "]"))]))
+         (string-append "[" (number->string (car type)) " x " (get-llvm-type (cdr type)) "]")]
+        [else type]))
 
 ; return block of codes
 (define (CompUnit ast)
@@ -95,7 +102,7 @@
           'declare
           (func-feat-ret (sym-feat x))
           (sym-id x)
-          (add-between (func-feat-para (sym-feat x)) ",")))
+          (add-between (map get-llvm-type (func-feat-para (sym-feat x))) ",")))
        (set->list func-include)))
      ; global varible declared
      (list (apply append var-content))
@@ -125,7 +132,8 @@
        (when (not (empty? array-info))
          (when (foldl
                 (lambda (x y) (or x y))
-                #f (map (lambda (x) (<= x 0)) array-info))
+                #f
+                (map (lambda (x) (<= x 0)) array-info))
            (error "array size under 0")))
        (try-hash-set!
         (car symbols)
@@ -173,7 +181,7 @@
                (lambda (x y) (or x y))
                #f
                (map (lambda (x) (<= x 0)) array-info))
-               (error "array size under 0"))
+          (error "array size under 0"))
         (try-hash-set! (car symbols) name (sym name id array-info (num-feat 'var)))
         (set-add! func-include (hash-ref lib-func "memset"))
         (append* (list (cons array-info (flatten (list id '= 'alloca (get-llvm-type array-info)))))
@@ -191,14 +199,26 @@
 (define (generate-get-ptr shape ptr pos counter)
   (define type (get-llvm-type shape))
   (define id (get-llvm-var counter))
-
-  (list (cons
-         (if (empty? (cdr shape)) 'i32 (cdr shape))
-         (flatten(list
-                  id '=
-                  'getelementptr type "," type '* ptr ","
-                  'i32 0 "," 'i32 pos 
-                  )))))
+  (define id2 (get-llvm-var counter))
+  
+  (if (equal? 'ptr (car shape))
+      (list
+       (list 'void id2 '= 'load type "," type '* ptr)
+       (cons
+             (if (empty? (cdr shape)) 'i32 (cdr shape))
+             (flatten(list
+                      id '=
+                      'getelementptr  (get-llvm-type (cdr shape))
+                      "," (get-llvm-type (cdr shape)) '* id2 ","
+                      (list 'i32 pos)))))
+      
+      (list (cons
+             (if (empty? (cdr shape)) 'i32 (cdr shape))
+             (flatten(list
+                      id '=
+                      'getelementptr type "," type '* ptr ","
+    
+                      (list 'i32 0 "," 'i32 pos )))))))
 
 (define (InitArr ast symbols counter pos [shape '()])
   (define content
@@ -248,36 +268,78 @@
 
   
 (define (FuncDef ast symbols counter)
-  (let ([ret-type (token-type (cdr(list-ref ast 0)))]
-        [func-name  (token-value (list-ref ast 1))]
-        [content (last ast)]
-        [global-symbols (list-ref symbols 0)]
-        [counter (make-counter)])
+  (let* ([counter (make-counter)]
+         [ret-type (if (equal? 'Int (token-type (cdr (first ast)))) 'i32 'void)]
+         [func-name (token-value (second ast))]
+         [paras (if (empty? (fourth ast))
+                    '()
+                    (FuncFParams (cdr (fourth ast)) symbols counter))]
+         [content (last ast)]
+         [global-symbols (last symbols)])
     ; check if this function name has already been used.
     ; add to globol symbol table if not.
     (try-hash-set!
      global-symbols
      func-name
-     (sym func-name (string-append "@" func-name) 'function '()))
+     (sym func-name
+          (string-append "@" func-name)
+          'function
+          (func-feat ret-type
+                     (map (lambda (x) (sym-type (cdr x))) paras))))
     ; deal with the function content
-    (append*
-     (list(list
-           'define
-           'dso_local
-           (get-llvm-type ret-type)
-           (string-append "@" func-name)
-           "()"))
-     (Block (cdr content) symbols counter))))
+    (append (append*
+     (list (list
+            'define
+            'dso_local
+            (get-llvm-type ret-type)
+            (string-append "@" func-name)
+            (flatten (add-between
+                      (map (lambda (x)
+                             (list (get-llvm-type (sym-type x))
+                                   (sym-id x)))
+                           (map cdr paras))
+                      ","))))
+     (Block (cdr content) symbols counter '() '() paras))
+            (list (list 'void 'ret (if (equal? ret-type 'void) 'void "i32 0"))))))
+
+(define (FuncFParams ast symbols counter)
+  (map (lambda (x)
+         (FuncFParam (cdr x) symbols counter))
+       (cons (car ast) (map second (second ast)))))
+
+
+(define (FuncFParam ast symbols counter)
+  (define name (token-value (second ast)))
+  (define array-info (third ast))
+  (define type
+    (if (empty? array-info)
+        'i32
+        (cons
+         'ptr
+         (map (lambda (x) (cal-const (second x))) (third array-info)))))
+  (cons name (sym name (get-llvm-var counter) type (num-feat 'var))))
   
 (define (Block ast symbols counter [block-start '()] [block-end '()] [args '()])
   ;TODO: need to add args to block-hash
+
   (let ([block-hash (make-hash)])
-    (loop-elem
-     (car (filter list? ast))
-     (cons block-hash symbols)
-     counter
-     block-start
-     block-end)))
+    (append
+     (append (map (lambda (x)
+                    (let ([id (get-llvm-var counter)]
+                          [name (car x)]
+                          [value (sym-id (cdr x))]
+                          [type (sym-type (cdr x))])
+                      (try-hash-set! block-hash name (sym name id type (num-feat 'var)))
+                      (list
+                       (list 'void id '= 'alloca (get-llvm-type type))
+                       (list 'void 'store (get-llvm-type type) value "," (get-llvm-type type) '* id))))
+                  args))
+     (loop-elem
+      (car (filter list? ast))
+      (cons block-hash symbols)
+      counter
+      block-start
+      block-end))))
 
 (define (Stmt ast symbols counter [block-start '()] [block-end '()])
   ; Stmt -> Assign | Exp-Stmt | Block | If | While | Break | Continue | Return
@@ -348,8 +410,11 @@
 (define (Assign-Stmt ast symbols counter [block-start '()] [block-end '()])
   ;(Assign-Stmt . (SEQ LVal Assign Exp Semicolon))
   (define ori-lval (LVal (cdar ast) symbols counter))
-  (define lval  (LVal (cdar ast) symbols counter))
-  (when (equal? 'const (get-type ori-lval ))
+  (define lval  (LVal (cdar ast) symbols counter)) 
+  (when (not (or (equal? (get-type lval) 'i32)
+                 (equal? (get-type lval) '())))
+    (error "can' assign"))
+  (when (equal? 'const (get-type ori-lval))
     (error "constant is not a legal left value"))
   (when (equal? 'function (get-type ori-lval))
     (error "function is not a legal left value"))
@@ -402,7 +467,7 @@
                      (second ast)))
   (define prev-code (map get-code array-par))
   (define array-info (map get-value array-par))
-  
+
   (let iter ([symbol-list symbols])
     ; if can't find the symbol
     (if (empty? symbol-list)
@@ -414,22 +479,19 @@
                 (when (and (equal? mode 'const)
                            (not (equal? 'const (num-feat-const (sym-feat symbol)))))
                   (error "expect a const"))
-                (if (pair? (sym-type symbol))
-                    (begin
-                      (when (not (equal? (length array-info) (length (sym-type symbol))))
-                        (error "disagreement in array dimension"))
-                      (append (append* '() prev-code)
-                              (let loop ([shape (sym-type symbol)]
-                                         [ref array-info]
-                                         [ptr (sym-id symbol)])
-                                (if (empty? shape)
-                                    '()
-                                    (let ([prev (generate-get-ptr shape ptr (car ref) counter)])
-                                      (append
-                                       prev
-                                       (loop (cdr shape) (cdr ref) (get-value prev))))))))
+                (if (pair? array-info)
+                    (append (append* '() prev-code)
+                            (let loop ([shape (sym-type symbol)]
+                                       [ref array-info]
+                                       [ptr (sym-id symbol)])
+                              (if (empty? ref)
+                                  '()
+                                  (let ([prev (generate-get-ptr shape ptr (car ref) counter)])
+                                    (append
+                                     prev
+                                     (loop (cdr shape) (cdr ref) (get-value prev)))))))
                     (list 'incomplete
-                          (if (equal? 'const (num-feat-const (sym-feat symbol))) 'const 'i32*)
+                          (if (equal? 'const (num-feat-const (sym-feat symbol))) 'const (sym-type symbol))
                           (sym-id symbol))))
               (iter (cdr symbol-list)))))))
               
@@ -554,13 +616,17 @@
             ; [value-ptr (get-code-and-num value)]
             [prev-code (get-code value)]
             [id (get-value value)])
-       (append
-        prev-code
-        (list (list
-               'i32
-               (get-llvm-var counter)
-               '= "load" "i32, i32*"
-               id)) ))]
+       (if (list? (get-type value))
+           (append
+            prev-code
+            (generate-get-ptr (get-type value) (get-value value) 0 counter))
+           (append
+            prev-code
+            (list (list
+                   'i32
+                   (get-llvm-var counter)
+                   '= "load" "i32, i32*"
+                   id)))))]
     ; if is '(' Exp ')'
     [(equal? (token-type (car ast)) 'LPar)
      (Exp (cdadr ast) symbols counter)]
@@ -581,13 +647,16 @@
   ; get func-def
   (define func-def
     (cond
+      [(hash-has-key? (last symbols) name)
+       (hash-ref (last symbols) name)]
       [(hash-has-key? lib-func name)
        (set-add! func-include (hash-ref lib-func name))
        (hash-ref lib-func name)]
-      [else (error "function not declared")]))
+      [else
+       (error (string-append name ": function not declared"))]))
   (define ret-type (func-feat-ret (sym-feat func-def)))
   (when (not (equal? (length (func-feat-para (sym-feat func-def))) (length  paras)))
-    (error "function call with wrong parameters"))
+    (error (string-append name ":function call with wrong parameters")))
   
   (append
    (foldl append '() (map get-code paras))
@@ -597,12 +666,13 @@
                              (list (get-llvm-var counter) '=))
                          (list
                           'call
-                          (func-feat-ret (sym-feat func-def))
+                          (get-llvm-type (func-feat-ret (sym-feat func-def)))
                           (sym-id func-def)
                           (flatten
                            (add-between
                             (map
-                             cons
+                             (lambda (x y)
+                               (cons (get-llvm-type x) y))
                              (func-feat-para
                               (sym-feat func-def))
                              (map get-value paras)) ","))))))))
