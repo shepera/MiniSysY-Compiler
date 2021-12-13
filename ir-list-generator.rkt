@@ -24,7 +24,7 @@
                         "putint"  (sym "putint" "@putint" 'function (func-feat 'void '(i32)))
                         "getch"  (sym "getch" "@getch" 'function (func-feat 'i32 '()))
                         "putch"  (sym "putch" "@putch" 'function (func-feat 'void '(i32)))
-                        "memset" (sym "memset" "@memset" 'function (func-feat 'void '(i32*, i32, i32)))))
+                        "memset" (sym "memset" "@memset" 'function (func-feat 'void '(i32* i32 i32)))))
                       
 (define func-include (mutable-set))
 
@@ -87,7 +87,7 @@
            (list global-hash)
            counter)])
     (append
-     ; function included
+     ; library functions included
      (list
       (map
        (lambda (x)
@@ -95,8 +95,7 @@
           'declare
           (func-feat-ret (sym-feat x))
           (sym-id x)
-          (func-feat-para (sym-feat x)))
-         )
+          (add-between (func-feat-para (sym-feat x)) ",")))
        (set->list func-include)))
      ; global varible declared
      (list (apply append var-content))
