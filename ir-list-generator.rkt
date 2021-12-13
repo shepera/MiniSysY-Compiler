@@ -205,12 +205,12 @@
       (list
        (list 'void id2 '= 'load type "," type '* ptr)
        (cons
-             (if (empty? (cdr shape)) 'i32 (cdr shape))
-             (flatten(list
-                      id '=
-                      'getelementptr  (get-llvm-type (cdr shape))
-                      "," (get-llvm-type (cdr shape)) '* id2 ","
-                      (list 'i32 pos)))))
+        (if (empty? (cdr shape)) 'i32 (cdr shape))
+        (flatten(list
+                 id '=
+                 'getelementptr  (get-llvm-type (cdr shape))
+                 "," (get-llvm-type (cdr shape)) '* id2 ","
+                 (list 'i32 pos)))))
       
       (list (cons
              (if (empty? (cdr shape)) 'i32 (cdr shape))
@@ -288,18 +288,18 @@
                      (map (lambda (x) (sym-type (cdr x))) paras))))
     ; deal with the function content
     (append (append*
-     (list (list
-            'define
-            'dso_local
-            (get-llvm-type ret-type)
-            (string-append "@" func-name)
-            (flatten (add-between
-                      (map (lambda (x)
-                             (list (get-llvm-type (sym-type x))
-                                   (sym-id x)))
-                           (map cdr paras))
-                      ","))))
-     (Block (cdr content) symbols counter '() '() paras))
+             (list (list
+                    'define
+                    'dso_local
+                    (get-llvm-type ret-type)
+                    (string-append "@" func-name)
+                    (flatten (add-between
+                              (map (lambda (x)
+                                     (list (get-llvm-type (sym-type x))
+                                           (sym-id x)))
+                                   (map cdr paras))
+                              ","))))
+             (Block (cdr content) symbols counter '() '() paras))
             (list (list 'void 'ret (if (equal? ret-type 'void) 'void "i32 0"))))))
 
 (define (FuncFParams ast symbols counter)
@@ -351,12 +351,18 @@
 
 (define (Ret ast symbols counter [block-start '()] [block-end '()])
   ; Return -> 'return' [Exp] ';'
-  (define ret-value  (Exp (cdadr ast) symbols counter))
-  (append (get-code ret-value)
-          (list(list
-                'void
-                'ret
-                'i32 (get-value ret-value)))))
+  (define ret-value (if (empty? (second ast))
+                        'void
+                        (Exp (cdadr ast) symbols counter)))
+  (if (empty? (second ast))
+      (list (list 'void 'ret 'void))
+      (append (get-code ret-value)
+              (list  (list
+                      'void
+                      'ret
+               
+                  
+                      'i32 (get-value ret-value))))))
 
 (define (Empty-Stmt ast symbols counter [block-start '()] [block-end '()])
   '())
