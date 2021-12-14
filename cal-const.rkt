@@ -142,4 +142,5 @@
         (ref (cdr pos) (list-ref value (car pos)))))
   (if (hash-has-key? global-var-hash name)
       (ref pos (global-sym-val (hash-ref global-var-hash name)))
-      (error "symbol not defined")))
+      ;(error "symbol not defined")
+      3))

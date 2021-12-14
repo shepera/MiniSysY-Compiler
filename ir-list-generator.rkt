@@ -264,9 +264,7 @@
   (InitVal (cdr ast) symbols counter pos shape))
 
 (define (ConstExp ast symbols counter)
-  (writeln ast)
-  (error 'here)
-  (AddExp ast symbols counter 'const))
+  (AddExp (cdr ast) symbols counter 'const))
 
   
 (define (FuncDef ast symbols counter)
@@ -556,7 +554,6 @@
   
 (define (cal-seq-exp ast symbols counter [mode 'val])
   ;this function is for AddExp and MulExp, for they have identify form
-  (writeln (car ast))
   (let add-loop ([loop-list (cadr ast)]
                  ; first operand, must exist
                  [add1 ((elem-eval (caar ast)) (cdar ast) symbols counter mode)])
@@ -693,4 +690,4 @@
 (define (ir-list-generator [ast ast])
   (CompUnit (cdar ast)))
 
-(ir-list-generator (parser))
+;(ir-list-generator (parser))
