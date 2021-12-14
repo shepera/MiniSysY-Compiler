@@ -323,8 +323,8 @@
   ;TODO: need to add args to block-hash
 
   (let ([block-hash (make-hash)])
-    (append
-     (append (map (lambda (x)
+    (append (append
+             (map (lambda (x)
                     (let ([id (get-llvm-var counter)]
                           [name (car x)]
                           [value (sym-id (cdr x))]
@@ -334,12 +334,12 @@
                        (list 'void id '= 'alloca (get-llvm-type type))
                        (list 'void 'store (get-llvm-type type) value "," (get-llvm-type type) '* id))))
                   args))
-     (loop-elem
-      (car (filter list? ast))
-      (cons block-hash symbols)
-      counter
-      block-start
-      block-end))))
+            (loop-elem
+             (car (filter list? ast))
+             (cons block-hash symbols)
+             counter
+             block-start
+             block-end))))
 
 (define (Stmt ast symbols counter [block-start '()] [block-end '()])
   ; Stmt -> Assign | Exp-Stmt | Block | If | While | Break | Continue | Return
@@ -360,55 +360,35 @@
               (list  (list
                       'void
                       'ret
-               
-                  
                       'i32 (get-value ret-value))))))
 
 (define (Empty-Stmt ast symbols counter [block-start '()] [block-end '()])
   '())
 
 (define (If-Stmt ast symbols counter [block-start '()] [block-end '()])
+  (define true-block-id (get-llvm-block-id counter))
+  (define false-block-id (get-llvm-block-id counter))
+  (define end-block-id (get-llvm-block-id counter))
+  
   (define condition
-    (type-cast (Cond (cdr (third ast)) symbols counter) 'i1 counter))
-  (define stmt1 (Stmt (fifth ast) symbols counter block-start block-end))
+    (Cond (cdr (third ast)) symbols counter true-block-id false-block-id))
+
+  (define stmt1
+    (append
+     (list (list 'void (string-append true-block-id ":")))
+     (Stmt (fifth ast) symbols counter block-start block-end)
+     (list (list 'void 'br 'label (string-append "%" end-block-id)))))
   (define stmt2
-    (let ([part (sixth ast)])
-      (if (empty? part)
-          '()
-          (Stmt (second part) symbols counter block-start block-end))))
-  (if (empty? stmt2)
-      (let ([block1 (get-llvm-block-id counter)]
-            [block2 (get-llvm-block-id counter)])    
-        (append
-         (get-code condition)
-         (list (list
-                'void
-                'br 'i1
-                (get-value condition) ","
-                'label (string-append "%" block1) ","
-                'label (string-append "%" block2)))
-         (list (list 'label (string-append block1 ":")))
-         (get-code stmt1)
-         (list (list 'void 'br 'label (string-append "%" block2)))
-         (list (list 'label (string-append block2 ":")))))
-      (let ([block1 (get-llvm-block-id counter)]
-            [block2 (get-llvm-block-id counter)]
-            [block3 (get-llvm-block-id counter)])
-        (append
-         (get-code condition)
-         (list (list
-                'void
-                'br 'i1
-                (get-value condition) ","
-                "label" (string-append "%" block1) ","
-                "label" (string-append "%" block2)))
-         (list (list 'label (string-append block1 ":")))
-         (get-code stmt1)
-         (list (list 'void 'br 'label (string-append "%" block3))) ; jump to end
-         (list (list 'label (string-append block2 ":")))
-         (get-code stmt2)
-         (list (list 'void 'br 'label (string-append "%" block3))) ;jump to end
-         (list (list 'label (string-append block3 ":")))))))
+    (append
+     (list (list 'void (string-append false-block-id ":")))
+     (let ([part (sixth ast)])
+       (if (empty? part)
+           '()
+           (Stmt (second part) symbols counter block-start block-end)))
+     (list (list 'void 'br 'label (string-append "%" end-block-id)))))
+  (append condition stmt1 stmt2
+          (list (list 'void (string-append end-block-id ":")))))
+
 
 (define (Expr-Stmt ast symbols counter [block-start '()] [block-end '()])
   (Exp (cdar ast)  symbols counter))
@@ -436,22 +416,18 @@
   (define content-start (get-llvm-block-id counter))
   (define end (get-llvm-block-id counter))
 
-  (define condition (Cond (cdr (third ast)) symbols counter))
+  (define condition
+    (Cond (cdr (third ast)) symbols counter content-start end))
+
   (define content
-    (Stmt (cdr (fifth ast)) symbols counter (string-append "%" cond-start) (string-append "%" end)))
+    (Stmt (cdr (fifth ast)) symbols counter
+          (string-append "%" cond-start)
+          (string-append "%" end)))
   (append
    ; jump to start of while (in case there is a unused block id)
-   (list (list 'void 'br 'label (string-append "%" cond-start)))
-   
+   (list (list 'void 'br 'label (string-append "%" cond-start)))  
    (list (list 'label (string-append cond-start ":")))
-   (get-code condition)
-   (list (list
-          'void
-          'br 'i1
-          (get-value condition) ","
-          'label (string-append "%" content-start) ","
-          'label (string-append "%" end)))
-
+   condition
    (list (list 'label (string-append content-start ":")))
    (get-code content)
    (list (list 'void 'br 'label (string-append "%" cond-start))) ;jump to end
@@ -574,16 +550,51 @@
   ; MulExp -> UnaryExp { ('*' | '/' | '%') UnaryExp }
   (cal-seq-exp ast symbols counter mode))
 
-(define (Cond ast symbols counter)
-  (type-cast (LOrExp (cdr ast) symbols counter) 'i1 counter))
+(define (Cond ast symbols counter true-block false-block)
+  (LOrExp (cdr ast) symbols counter true-block false-block))
 
-(define (LOrExp ast symbols counter [mode 'val])
+(define (LOrExp ast symbols counter true-block false-block)
   ; LOrExp -> LAndExp { '||' LAndExp }
-  (cal-seq-exp ast symbols counter mode))
+  (define and-list (cons (first ast) (map second (second ast))))
+  (define false-list (append
+                      (build-list (sub1 (length and-list))
+                                  (lambda (x) (get-llvm-block-id counter)))
+                      (list false-block)))
+  (define and-blocks (map
+                      (lambda (and-item false-block)
+                        (LAndExp (cdr and-item) symbols counter true-block false-block))
+                      and-list false-list))
+  (apply append (cons
+                 (car and-blocks)
+                 (map
+                  (lambda (block block-id)
+                    (cons (list 'void (string-append block-id ":"))
+                          block))
+                  (cdr and-blocks) (drop-right false-list 1)))))
 
-(define (LAndExp ast symbols counter [mode 'val])
+(define (LAndExp ast symbols counter true-block false-block)
   ; LAndExp -> EqExp { '&&' EqExp }
-  (cal-seq-exp ast symbols counter mode))
+  (define and-list (cons (first ast) (map second (second ast))))
+  (define true-list (append
+                     (build-list (sub1 (length and-list)) (lambda (x) (get-llvm-block-id counter)))
+                     (list true-block)))
+  (define exps
+    (map (lambda (x)
+           (type-cast (EqExp (cdr x) symbols counter) 'i1 counter))
+         and-list))
+  
+  (append (append*
+           '()
+           (map
+            (lambda (exp true-block block-id)
+              (append
+               (if (empty? block-id) '() (list (list 'void (string-append block-id ":"))))
+               (append
+                (get-code exp)
+                (list (list 'void 'br 'i1 (get-value exp) ","
+                            'label (string-append "%" true-block) ","
+                            'label (string-append "%" false-block))))))
+            exps true-list (cons '() (drop-right true-list 1))))))
 
 (define (EqExp ast symbols counter [mode 'val])
   (cal-seq-exp ast symbols counter mode))
