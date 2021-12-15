@@ -631,7 +631,6 @@
     ; if is a lVal
     [(equal? (car ast) 'LVal)
      (let* ([value (LVal (cdr ast) symbols counter mode)]
-            ; [value-ptr (get-code-and-num value)]
             [prev-code (get-code value)]
             [id (get-value value)])
        (if (list? (get-type value))
