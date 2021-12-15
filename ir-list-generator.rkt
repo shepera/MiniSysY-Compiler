@@ -217,12 +217,13 @@
              (flatten(list
                       id '=
                       'getelementptr type "," type '* ptr ","
-    
                       (list 'i32 0 "," 'i32 pos )))))))
 
 (define (InitArr ast symbols counter pos [shape '()])
   (define content
-    (if (empty? (second ast)) '() (append (list (car (second ast))) (map second (cadr (second ast))))))
+    (if (empty? (second ast))
+        '()
+        (append (list (car (second ast))) (map second (cadr (second ast))))))
   (define ptrs (map (lambda (x) (generate-get-ptr shape pos x counter))
                     (range (length content))))
 
@@ -316,7 +317,7 @@
         'i32
         (cons
          'ptr
-         (map (lambda (x) (cal-const (second x))) (third array-info)))))
+         (map (lUnaryExpambda (x) (cal-const (second x))) (third array-info)))))
   (cons name (sym name (get-llvm-var counter) type (num-feat 'var))))
   
 (define (Block ast symbols counter [block-start '()] [block-end '()] [args '()])
@@ -652,7 +653,7 @@
 
 (define (FuncCall ast symbols counter)
   (define name (token-value (car ast)))
-  ;define act-para
+  ;define actual-para
   (define paras
     (if (empty? (third ast))
         '()
